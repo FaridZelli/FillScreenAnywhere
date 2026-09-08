@@ -8,15 +8,21 @@
 
 A browser extension that allows you to zoom into videos across numerous streaming platforms.
 
-## Mobile notes:
+## Mobile notes
 > Pinch-out on your screen to zoom-in anywhere.  
 > Long-press the full screen button to zoom-in on YouTube.  
 > For IronFox: Enable "Allow for all sites" permission after installation.
 
-## Desktop notes:
+## Desktop notes
 > Fill Screen: `Ctrl+Alt+F`  
 > Remove Letterboxing: `Ctrl+Alt+L`  
 > See [Manage extension shortcuts in Firefox](https://support.mozilla.org/en-US/kb/manage-extension-shortcuts-firefox) for more info.
+
+## Features
+- Website allow/deny lists
+- Limit crop ratio for ultra-wide or standard content
+- Remove 16:9 letterboxing from 21:9 content
+
 ---
 
 <picture>
@@ -30,6 +36,6 @@ A browser extension that allows you to zoom into videos across numerous streamin
 </picture>
   
   
-## Special thanks:
+## Special thanks
   
-- [Tabler Icons](https://github.com/tabler/tabler-icons)
+[Tabler Icons](https://github.com/tabler/tabler-icons)
