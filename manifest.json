@@ -1,13 +1,23 @@
 {
   "manifest_version": 3,
   "name": "Fill Screen Anywhere",
-  "version": "1.1",
+  "version": "1.2",
   "author": "Farid Zelli",
   "homepage_url": "https://github.com/FaridZelli/FillScreenAnywhere",
   "description": "Zoom into videos on almost any website.",
   "icons": {
     "16": "fillscreenanywhere.svg",
     "32": "fillscreenanywhere.svg"
+  },
+
+  "permissions": ["storage"],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "fillscreenanywhere.svg",
+      "32": "fillscreenanywhere.svg"
+    }
   },
 
   "browser_specific_settings": {

@@ -13,6 +13,23 @@ const RATIO_16_9 = 16 / 9;
 const RATIO_3_2 = 3 / 2;
 const RATIO_2_1 = 2 / 1;
 
+// ---- Options (popup) settings -----------------------------------------
+let capTallerLimit = true;
+let capWiderLimit = true;
+
+function hostMatches(host, entry) {
+    entry = entry.trim().toLowerCase();
+    if (!entry) return false;
+    return host === entry || host.endsWith('.' + entry);
+}
+
+function isSiteEnabled(settings) {
+    const host = location.hostname.toLowerCase();
+    const list = settings.mode === 'allow' ? settings.allowList : settings.denyList;
+    const matched = list.some(entry => hostMatches(host, entry));
+    return settings.mode === 'allow' ? matched : !matched;
+}
+
 // ---- Environment Detection -------------------------------------------
 const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches || 
                   (!('ontouchstart' in window) && navigator.maxTouchPoints === 0);
@@ -109,13 +126,13 @@ function capScaleForHorizontalDisplay(scale, video) {
 
     // If video is 3:2 or taller, and the display is wider than the video,
     // never crop it wider than 16:9.
-    if (vRatio <= RATIO_3_2 && sRatio > vRatio) {
+    if (capTallerLimit && vRatio <= RATIO_3_2 && sRatio > vRatio) {
         capped = Math.min(capped, RATIO_16_9 / vRatio);
     }
 
     // If video is 2:1 or wider, and the display is taller than the video,
     // never crop it taller than 16:9.
-    if (vRatio >= RATIO_2_1 && sRatio < vRatio) {
+    if (capWiderLimit && vRatio >= RATIO_2_1 && sRatio < vRatio) {
         capped = Math.min(capped, vRatio / RATIO_16_9);
     }
 
@@ -689,10 +706,20 @@ function onFullscreenChange() {
 })();
 
 // ---- Boot ------------------------------------------------------------
-document.addEventListener('fullscreenchange', onFullscreenChange);
-document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-document.addEventListener('contextmenu', onContextMenu, true);
+chrome.storage.sync.get(
+    { mode: 'deny', allowList: [], denyList: [], capTaller: true, capWider: true },
+    (settings) => {
+        if (!isSiteEnabled(settings)) return;
 
-if (currentFullscreenElement()) onFullscreenChange();
+        capTallerLimit = settings.capTaller;
+        capWiderLimit = settings.capWider;
+
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+        document.addEventListener('contextmenu', onContextMenu, true);
+
+        if (currentFullscreenElement()) onFullscreenChange();
+    }
+);
 
 })();

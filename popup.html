@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; width: 300px; max-width: 100%; padding: 16px;
+    background: #1c1c1e; color: #f2f2f2;
+    font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .seg { display: flex; background: #2c2c2e; border-radius: 8px; padding: 2px; margin-bottom: 10px; }
+  .seg button {
+    flex: 1; padding: 6px 0; border: 0; background: transparent; color: #9a9a9e;
+    border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500;
+  }
+  .seg button.active { background: #ff0033; color: #fff; }
+  textarea {
+    width: 100%; min-height: 72px; resize: vertical;
+    background: #2c2c2e; color: #f2f2f2; border: 1px solid #3a3a3c;
+    border-radius: 8px; padding: 8px; font: 12px monospace;
+  }
+  .hint { color: #8e8e93; font-size: 11px; margin: 4px 0 14px; }
+  hr { border: 0; border-top: 1px solid #2c2c2e; margin: 14px 0; }
+  .switch { position: relative; display: inline-block; width: 36px; height: 21px; flex-shrink: 0; cursor: pointer; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .slider { position: absolute; inset: 0; background: #3a3a3c; border-radius: 22px; transition: .2s; pointer-events: none; }
+  .slider::before { content: ""; position: absolute; width: 17px; height: 17px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: .2s; }
+  input:checked + .slider { background: #ff0033; }
+  input:checked + .slider::before { transform: translateX(15px); }
+  .restore-btn {
+    width: 100%; padding: 8px 0; margin-top: 2px;
+    background: #2c2c2e; color: #ff0033; border: 1px solid #3a3a3c;
+    border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600;
+  }
+  .restore-btn:hover { background: #3a3a3c; }
+</style>
+</head>
+<body>
+  <h1>Fill Screen Anywhere</h1>
+
+  <div class="seg">
+    <button id="modeDeny" class="active">Deny list</button>
+    <button id="modeAllow">Allow list</button>
+  </div>
+  <textarea id="denyList" placeholder="example.com&#10;one site per line"></textarea>
+  <textarea id="allowList" placeholder="example.com&#10;one site per line" style="display:none"></textarea>
+  <div class="hint" id="listHint">Runs on every site except these.</div>
+
+  <hr>
+
+  <div class="row">
+    <label for="capTaller">Limit crop on 3:2 or taller videos</label>
+    <div class="switch"><input type="checkbox" id="capTaller" checked><span class="slider"></span></div>
+  </div>
+  <div class="row">
+    <label for="capWider">Limit crop on 2:1 or wider videos</label>
+    <div class="switch"><input type="checkbox" id="capWider" checked><span class="slider"></span></div>
+  </div>
+
+  <hr>
+
+  <button id="restoreDefaults" class="restore-btn">Restore Defaults</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
