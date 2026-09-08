@@ -13,7 +13,7 @@
   "permissions": ["storage"],
 
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "/popup.html",
     "default_icon": {
       "16": "fillscreenanywhere.svg",
       "32": "fillscreenanywhere.svg"
@@ -26,6 +26,32 @@
       "data_collection_permissions": {
         "required": ["none"]
       }
+    },
+    "gecko_android": {}
+  },
+
+  "options_ui": {
+    "page": "/popup.html"
+  },
+
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+
+  "commands": {
+    "fill-screen": {
+      "suggested_key": {
+        "default": "Ctrl+Alt+F"
+      },
+      "description": "Fill Screen"
+    },
+    "remove-letterbox": {
+      "suggested_key": {
+        "default": "Ctrl+Alt+L"
+      },
+      "description": "Remove Letterboxing"
     }
   },
 

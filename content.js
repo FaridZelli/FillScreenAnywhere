@@ -722,4 +722,26 @@ chrome.storage.sync.get(
     }
 );
 
+// ---- Keyboard Shortcuts Handler --------------------------------------
+function handleShortcut(type) {
+    if (!videoEl || !isDesktop) return;
+
+    const isFillPresent = currentMode === 1 || (currentMode === 0 && !(is16x9Video && is16x9Screen));
+    const isLetterboxPresent = currentMode === 2 || (currentMode === 0 && is16x9Video && (is16x9Screen || isTallerHorizontalScreen));
+
+    if (type === 'fill' && isFillPresent) {
+        applyZoom(currentMode === 1 ? 0 : 1);
+    } else if (type === 'letterbox' && isLetterboxPresent) {
+        applyZoom(currentMode === 2 ? 0 : 2);
+    }
+}
+
+chrome.runtime.onMessage.addListener((request) => {
+    if (request.action === 'fill-screen') {
+        handleShortcut('fill');
+    } else if (request.action === 'remove-letterbox') {
+        handleShortcut('letterbox');
+    }
+});
+
 })();

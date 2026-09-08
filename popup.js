@@ -1,3 +1,9 @@
+// ---- Environment Detection (mirrors content.js) -------------------------
+const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches ||
+                  (!('ontouchstart' in window) && navigator.maxTouchPoints === 0);
+
+if (!isDesktop) document.documentElement.classList.add('is-mobile');
+
 const $ = (id) => document.getElementById(id);
 const defaults = { mode: 'deny', allowList: [], denyList: [], capTaller: true, capWider: true };
 
