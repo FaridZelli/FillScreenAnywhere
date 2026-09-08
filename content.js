@@ -255,7 +255,7 @@ function applyZoom(mode) {
 
 // ---- Mobile: Pinch gesture -------------------------------------------
 function onTouchStart(e) {
-    if (isYouTube) return;
+    // if (isYouTube) return;
     if (e.touches.length === 2) {
         blockTouchEvent(e);
         pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
@@ -266,7 +266,7 @@ function onTouchStart(e) {
 }
 
 function onTouchMove(e) {
-    if (isYouTube) return;
+    // if (isYouTube) return;
     if (e.touches.length !== 2) return;
     blockTouchEvent(e);
     if (pinchStartDist === null || gestureDone) return;
