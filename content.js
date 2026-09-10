@@ -686,7 +686,7 @@ function onFullscreenChange() {
 }
 
 // ---- Force viewport-fit=cover ----------------------------------------
-(function forceViewportFitCover() {
+function forceViewportFitCover() {
     let meta = document.querySelector('meta[name="viewport"]');
 
     if (meta) {
@@ -703,7 +703,7 @@ function onFullscreenChange() {
         meta.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
         (document.head || document.documentElement).appendChild(meta);
     }
-})();
+}
 
 // ---- Boot ------------------------------------------------------------
 chrome.storage.sync.get(
@@ -713,6 +713,8 @@ chrome.storage.sync.get(
 
         capTallerLimit = settings.capTaller;
         capWiderLimit = settings.capWider;
+
+        forceViewportFitCover();
 
         document.addEventListener('fullscreenchange', onFullscreenChange);
         document.addEventListener('webkitfullscreenchange', onFullscreenChange);
