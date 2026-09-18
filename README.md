@@ -9,20 +9,19 @@
 A browser extension that allows you to zoom into videos across numerous streaming platforms.
 
 ## Browser compatibility
-> Works on both Firefox and Chromium (see [releases](https://github.com/FaridZelli/FillScreenAnywhere/releases/latest) for XPI/CRX files).
+Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/FillScreenAnywhere/releases/latest) for XPI/CRX files).
 
 ## Mobile notes
-> Pinch-out on your screen to zoom-in anywhere.  
-> Long-press the full screen button to zoom-in on YouTube.  
-> IronFox: Enable "Allow for all sites" permission after installation.
+- Pinch-out on your screen (works anywhere) or long press the full screen button (YouTube only).
+- IronFox: Enable "Allow for all sites" permission after installation.
 
 ## Desktop notes
-> Fill Screen: `Ctrl+Alt+F`  
-> Remove Letterboxing: `Ctrl+Alt+L`  
+- Fill Screen: `Ctrl+Alt+F`  
+- Remove Letterboxing: `Ctrl+Alt+L`  
 > See [Manage extension shortcuts in Firefox](https://support.mozilla.org/en-US/kb/manage-extension-shortcuts-firefox) for more info.
 
 ## Features
-- Website allow/deny lists
+- Website allow/deny list
 - Limit crop ratio for ultra-wide or standard content
 - Remove 16:9 letterboxing from 21:9 content
 
