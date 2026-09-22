@@ -3,7 +3,7 @@
   height="24"
   viewBox="0 0 24 24"
   fill="none"
-  stroke="#ff0033"
+  stroke="#ff5500"
   stroke-width="2"
   stroke-linecap="round"
   stroke-linejoin="round"
@@ -14,27 +14,27 @@
   <!-- Top-Right -->
 
   <path d="M17 1h6v6" />
-  <path d="M23 1.8c-2.3 1.1-4 2.7-5 5" />
+  <path d="M23 2a6 7 0 0 0-5 6.5" />
 
   <!-- Bottom-Left -->
 
   <path d="M7 23h-6v-6" />
-  <path d="M1 22.2c2.3-1.1 4-2.7 5-5" />
+  <path d="M1 22a6 6 0 0 0 5-6.5" />
 
   <!-- Bottom-Right -->
 
   <path d="M17 23h6v-6" />
-  <path d="M23 22.2c-2.3-1.1-4-2.7-5-5" />
+  <path d="M23 22a6 6 0 0 1-5-6.5" />
 
   <!-- Top-Left -->
 
   <path d="M7 1h-6v6" />
-  <path d="M1 1.8c2.3 1.1 4 2.7 5 5" />
+  <path d="M1 2a6 7 0 0 1 5 6.5" />
 
   <!-- Center Play Button -->
 
   <path d="M10 8l6 4l-6 4z"
-    fill="#ff0033"
+    fill="#ff5500"
     stroke-linejoin="round" />
-     
+
 </svg>
