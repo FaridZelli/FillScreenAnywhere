@@ -1,5 +1,5 @@
 (function () {
-'use strict';
+    'use strict';
 
 // ---- Tunables --------------------------------------------------------
 const PINCH_THRESHOLD = 40;
@@ -8,21 +8,42 @@ const LONG_PRESS_MS = 550;
 const LETTERBOX_SCALE = 1.333333; // 1 / 0.75 (Crops exactly 25% of the video)
 const UI_HIDE_DELAY = 3000;
 
-// ---- Aspect-ratio limits ----------------------------------------------
+// ---- Aspect ratio limits ---------------------------------------------
 const RATIO_16_9 = 16 / 9;
 const RATIO_3_2 = 3 / 2;
 const RATIO_2_1 = 2 / 1;
 
-// ---- Options (popup) settings -----------------------------------------
+// ---- Options (popup) settings ----------------------------------------
 let capTallerLimit = true;
 let capWiderLimit = true;
+let centerVideos = true;
+let pinchGesturesEnabled = true;
+let toggleButtons = true;
+let overrideYouTube = true;
 
+// ---- Live settings state ---------------------------------------------
+const DEFAULT_SETTINGS = {
+    mode: 'deny',
+    allowList: [],
+    denyList: [],
+    capTaller: true,
+    capWider: true,
+    centerVideos: true,
+    pinchGestures: true,
+    toggleButtons: true,
+    overrideYouTube: true
+};
+let currentSettings = { ...DEFAULT_SETTINGS };
+let isActive = false;
+// Viewport state for live toggling of viewport-fit=cover
+let viewportModified = false;
+let viewportCreated = false;
+let originalViewportContent = null;
 function hostMatches(host, entry) {
     entry = entry.trim().toLowerCase();
     if (!entry) return false;
     return host === entry || host.endsWith('.' + entry);
 }
-
 function isSiteEnabled(settings) {
     const host = location.hostname.toLowerCase();
     const list = settings.mode === 'allow' ? settings.allowList : settings.denyList;
@@ -30,9 +51,21 @@ function isSiteEnabled(settings) {
     return settings.mode === 'allow' ? matched : !matched;
 }
 
-// ---- Environment Detection -------------------------------------------
-const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches || 
-                  (!('ontouchstart' in window) && navigator.maxTouchPoints === 0);
+// ---- Environment detection -------------------------------------------
+function detectIsDesktop() {
+    let hasFinePointer = false;
+    try {
+        hasFinePointer = window.matchMedia &&
+        window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    } catch (e) {
+        hasFinePointer = false;
+    }
+    if (hasFinePointer) return true;
+    const w = (window.screen && window.screen.width) || window.innerWidth || 0;
+    const h = (window.screen && window.screen.height) || window.innerHeight || 0;
+    return Math.min(w, h) >= 480;
+}
+const isDesktop = detectIsDesktop();
 
 // ---- YouTube detection -----------------------------------------------
 const isYouTube = /(?:^|.|-)youtube.com$|(?:^|.|-)youtu.be$|(?:^|.|-)youtube-nocookie.com$/i.test(location.hostname);
@@ -40,36 +73,32 @@ const isYouTube = /(?:^|.|-)youtube.com$|(?:^|.|-)youtu.be$|(?:^|.|-)youtube-noc
 // ---- State -----------------------------------------------------------
 let fullscreenEl = null;
 let videoEl = null;
-let targetEl = null;       
-let playerEl = null;       
+let targetEl = null;
+let playerEl = null;
 let zoomed = false;
 let currentMode = 0; // 0: none, 1: fill, 2: letterbox
 let savedStyle = null;
 let pinchStartDist = null;
 let gestureDone = false;
 let pointers = new Set();
-let zoomTimeoutId = null; 
-
+let zoomTimeoutId = null;
 // Aspect ratio state
 let is16x9Video = false;
 let is16x9Screen = false;
 let isTallerHorizontalScreen = false;
 let videoResizeHandler = null;
-
-// YouTube long-press state (Mobile only)
+// Mobile: YouTube long-press state
 let ytLongPressTimer = null;
 let ytFsButton = null;
-
-// Desktop button state
+// Desktop: Button state
 let btnContainer = null;
-
-// Desktop UI auto-hide state
+// Desktop: UI auto-hide state
 let uiHideTimer = null;
 let uiHoverCount = 0;
 let uiFocusCount = 0;
 let uiInteractionHandler = null;
 
-// ---- Desktop Button SVGs ---------------------------------------------
+// ---- Desktop button SVGs ---------------------------------------------
 const svgFill = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrows-maximize" style="width: 20px; height: 20px; flex-shrink: 0;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/></svg>`;
 const svgReset = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrows-minimize" style="width: 20px; height: 20px; flex-shrink: 0;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 9l4 0l0 -4"/><path d="M3 3l6 6"/><path d="M5 15l4 0l0 4"/><path d="M3 21l6 -6"/><path d="M19 9l-4 0l0 -4"/><path d="M15 9l6 -6"/><path d="M19 15l-4 0l0 4"/><path d="M15 15l6 6"/></svg>`;
 const svgLetterbox = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-crop"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 4v12a1 1 0 0 0 1 1h12" /><path d="M4 7h12a1 1 0 0 1 1 1v12" /></svg>`;
@@ -78,7 +107,6 @@ const svgLetterbox = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height=
 function currentFullscreenElement() {
     return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
-
 function findVideo(root) {
     if (!root) return null;
     if (root.tagName === 'VIDEO') return root;
@@ -93,11 +121,9 @@ function findVideo(root) {
     });
     return best;
 }
-
 function touchDistance(a, b) {
     return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
 }
-
 function fillScale(video) {
     const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) return 1;
@@ -105,45 +131,36 @@ function fillScale(video) {
     return Math.max(vr / sr, sr / vr);
 }
 
-// ---- Universal crop limitation ----------------------------------------
+// ---- Universal: Crop limits ------------------------------------------
 function capScaleForHorizontalDisplay(scale, video) {
     if (!video) return scale;
-
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     const sw = window.innerWidth;
     const sh = window.innerHeight;
-
     if (!vw || !vh || !sw || !sh) return scale;
-
     const vRatio = vw / vh;
     const sRatio = sw / sh;
-
     // Limitation applies only when the device display is horizontal.
     if (sRatio <= 1) return scale;
-
     let capped = scale;
-
     // If video is 3:2 or taller, and the display is wider than the video,
     // never crop it wider than 16:9.
     if (capTallerLimit && vRatio <= RATIO_3_2 && sRatio > vRatio) {
         capped = Math.min(capped, RATIO_16_9 / vRatio);
     }
-
     // If video is 2:1 or wider, and the display is taller than the video,
     // never crop it taller than 16:9.
     if (capWiderLimit && vRatio >= RATIO_2_1 && sRatio < vRatio) {
         capped = Math.min(capped, vRatio / RATIO_16_9);
     }
-
     return capped;
 }
-
 function cappedFillScale(video) {
     return capScaleForHorizontalDisplay(fillScale(video), video);
 }
 
-// ---- Aspect Ratio Detection ------------------------------------------
+// ---- Aspect ratio detection ------------------------------------------
 function updateAspectRatios() {
     if (!videoEl) {
         is16x9Video = false;
@@ -151,84 +168,132 @@ function updateAspectRatios() {
         isTallerHorizontalScreen = false;
         return;
     }
-
     const vw = videoEl.videoWidth;
     const vh = videoEl.videoHeight;
     const sw = window.innerWidth;
     const sh = window.innerHeight;
-
     if (!vw || !vh || !sw || !sh) {
         is16x9Video = false;
         is16x9Screen = false;
         isTallerHorizontalScreen = false;
         return;
     }
-
     const vRatio = vw / vh;
     const sRatio = sw / sh;
-
     const TOLERANCE = 0.08;
-
     is16x9Video = (vRatio > RATIO_16_9 - TOLERANCE && vRatio < RATIO_16_9 + TOLERANCE);
     is16x9Screen = (sRatio > RATIO_16_9 - TOLERANCE && sRatio < RATIO_16_9 + TOLERANCE);
     isTallerHorizontalScreen = (sRatio > 1.0 && sRatio <= RATIO_16_9 - TOLERANCE);
 }
 
-// ---- Gesture-blocking helpers (Mobile only) --------------------------
+// ---- Universal: Pinch gestures & web player gesture-blocking ---------
 function blockTouchEvent(e) {
     if (e.cancelable) e.preventDefault();
     e.stopPropagation();
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 }
-
 function blockPointerEvent(e) {
     e.stopPropagation();
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 }
-
 function setTouchAction(el) {
     if (el) el.style.setProperty('touch-action', 'none', 'important');
 }
+function onTouchStart(e) {
+    // Disable gestures on YouTube mobile player due to jankiness.
+    if (isYouTube && !isDesktop && overrideYouTube) return;
+    if (e.touches.length === 2) {
+        blockTouchEvent(e);
+        pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
+        gestureDone = false;
+    } else {
+        pinchStartDist = null;
+    }
+}
+function onTouchMove(e) {
+    // Disable gestures on YouTube mobile player due to jankiness.
+    if (isYouTube && !isDesktop && overrideYouTube) return;
+    if (e.touches.length !== 2) return;
+    blockTouchEvent(e);
+    if (pinchStartDist === null || gestureDone) return;
+    const delta = touchDistance(e.touches[0], e.touches[1]) - pinchStartDist;
+    if (!zoomed && delta > PINCH_THRESHOLD)       { applyZoom(1); gestureDone = true; }
+    else if (zoomed && delta < -PINCH_THRESHOLD)  { applyZoom(0); gestureDone = true; }
+}
+function onTouchEnd(e) {
+    if (e.touches.length < 2) { pinchStartDist = null; gestureDone = false; }
+}
+function onPointerDown(e) {
+    if (e.pointerType !== 'touch') return;
+    pointers.add(e.pointerId);
+    if (pointers.size >= 2) blockPointerEvent(e);
+}
+function onPointerMove(e) {
+    if (e.pointerType !== 'touch' || pointers.size < 2) return;
+    blockPointerEvent(e);
+}
+function onPointerEnd(e) {
+    if (e.pointerType !== 'touch') return;
+    pointers.delete(e.pointerId);
+}
+function attachGestureListeners(root) {
+    if (!pinchGesturesEnabled || !root) return;
+    setTouchAction(videoEl);
+    if (root !== videoEl) setTouchAction(root);
+    root.addEventListener('touchstart',  onTouchStart,  { capture: true, passive: false });
+    root.addEventListener('touchmove',   onTouchMove,   { capture: true, passive: false });
+    root.addEventListener('touchend',    onTouchEnd,    { capture: true, passive: true  });
+    root.addEventListener('touchcancel', onTouchEnd,    { capture: true, passive: true  });
+    if (window.PointerEvent) {
+        root.addEventListener('pointerdown',   onPointerDown,  { capture: true, passive: true });
+        root.addEventListener('pointermove',   onPointerMove,  { capture: true, passive: true });
+        root.addEventListener('pointerup',     onPointerEnd,   { capture: true, passive: true });
+        root.addEventListener('pointercancel', onPointerEnd,   { capture: true, passive: true });
+    }
+}
+function detachGestureListeners(root) {
+    if (!root) return;
+    root.removeEventListener('touchstart',  onTouchStart,  { capture: true });
+    root.removeEventListener('touchmove',   onTouchMove,   { capture: true });
+    root.removeEventListener('touchend',    onTouchEnd,    { capture: true });
+    root.removeEventListener('touchcancel', onTouchEnd,    { capture: true });
+    if (window.PointerEvent) {
+        root.removeEventListener('pointerdown',   onPointerDown,  { capture: true });
+        root.removeEventListener('pointermove',   onPointerMove,  { capture: true });
+        root.removeEventListener('pointerup',     onPointerEnd,   { capture: true });
+        root.removeEventListener('pointercancel', onPointerEnd,   { capture: true });
+    }
+}
 
-// ---- Core zoom (pixel-anchored to video center) ----------------------
+// ---- Core zoom logic (pixel anchored to video center) ----------------
 function applyZoom(mode) {
     if (!targetEl || !fullscreenEl) return;
-
     if (zoomTimeoutId) {
         clearTimeout(zoomTimeoutId);
         zoomTimeoutId = null;
     }
-
     currentMode = mode;
-
     if (mode !== 0) {
         let scale = 1;
-
         if (mode === 1) {
             scale = cappedFillScale(videoEl);
         } else if (mode === 2) {
             scale = capScaleForHorizontalDisplay(LETTERBOX_SCALE, videoEl);
         }
-
         if (scale <= 1.02) {
             currentMode = 0;
             zoomed = false;
             updateDesktopButtons();
             return;
         }
-
         targetEl.style.transition = 'none';
         targetEl.style.transform = 'none';
         void targetEl.offsetWidth;
-
         const videoRect = videoEl.getBoundingClientRect();
         const tRect = targetEl.getBoundingClientRect();
-
         if (videoRect.width === 0 || videoRect.height === 0) return;
-
         const ox = (videoRect.left + videoRect.width / 2) - tRect.left;
         const oy = (videoRect.top + videoRect.height / 2) - tRect.top;
-
         targetEl.style.setProperty('transform-origin', `${ox}px ${oy}px`, 'important');
         targetEl.style.transition = TRANSITION;
         void targetEl.offsetWidth;
@@ -237,7 +302,6 @@ function applyZoom(mode) {
         targetEl.style.transition = TRANSITION;
         void targetEl.offsetWidth;
         targetEl.style.transform = '';
-
         zoomTimeoutId = setTimeout(() => {
             zoomTimeoutId = null;
             if (!targetEl) return;
@@ -248,62 +312,24 @@ function applyZoom(mode) {
                 targetEl.style.removeProperty('transform-origin');
         }, 550);
     }
-
     zoomed = (mode !== 0);
     updateDesktopButtons();
 }
 
-// ---- Mobile: Pinch gesture -------------------------------------------
-function onTouchStart(e) {
-    // if (isYouTube) return;
-    if (e.touches.length === 2) {
-        blockTouchEvent(e);
-        pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
-        gestureDone = false;
-    } else {
-        pinchStartDist = null;
-    }
+// ---- Mobile: YouTube full-screen button long-press -------------------
+function onYTButtonContextMenu(e) {
+    if (!isYouTube || !fullscreenEl) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 }
-
-function onTouchMove(e) {
-    // if (isYouTube) return;
-    if (e.touches.length !== 2) return;
-    blockTouchEvent(e);
-    if (pinchStartDist === null || gestureDone) return;
-    const delta = touchDistance(e.touches[0], e.touches[1]) - pinchStartDist;
-    if (!zoomed && delta > PINCH_THRESHOLD)       { applyZoom(1); gestureDone = true; }
-    else if (zoomed && delta < -PINCH_THRESHOLD)  { applyZoom(0); gestureDone = true; }
-}
-
-function onTouchEnd(e) {
-    if (e.touches.length < 2) { pinchStartDist = null; gestureDone = false; }
-}
-
-function onPointerDown(e) {
-    if (e.pointerType !== 'touch') return;
-    pointers.add(e.pointerId);
-    if (pointers.size >= 2) blockPointerEvent(e);
-}
-
-function onPointerMove(e) {
-    if (e.pointerType !== 'touch' || pointers.size < 2) return;
-    blockPointerEvent(e);
-}
-
-function onPointerEnd(e) {
-    if (e.pointerType !== 'touch') return;
-    pointers.delete(e.pointerId);
-}
-
-// ---- Mobile: YouTube long-press --------------------------------------
 function findYTFullscreenButton() {
     return document.querySelector('.ytp-fullscreen-button') ||
-           document.querySelector('button[aria-label*="Full screen" i]') ||
-           document.querySelector('button[aria-label*="Exit full screen" i]') ||
-           document.querySelector('button[title*="Full screen" i]') ||
-           document.querySelector('button[title*="Exit full screen" i]');
+    document.querySelector('button[aria-label*="Full screen" i]') ||
+    document.querySelector('button[aria-label*="Exit full screen" i]') ||
+    document.querySelector('button[title*="Full screen" i]') ||
+    document.querySelector('button[title*="Exit full screen" i]');
 }
-
 function onYTFsTouchStart(e) {
     if (e.touches.length !== 1) return;
     ytLongPressTimer = setTimeout(() => {
@@ -312,10 +338,8 @@ function onYTFsTouchStart(e) {
         applyZoom(zoomed ? 0 : 1);
     }, LONG_PRESS_MS);
 }
-
 function onYTFsTouchEnd()    { if (ytLongPressTimer) { clearTimeout(ytLongPressTimer); ytLongPressTimer = null; } }
 function onYTFsTouchMove()   { if (ytLongPressTimer) { clearTimeout(ytLongPressTimer); ytLongPressTimer = null; } }
-
 function attachYTLongPress() {
     const btn = findYTFullscreenButton();
     if (!btn || btn === ytFsButton) return;
@@ -325,142 +349,118 @@ function attachYTLongPress() {
     btn.addEventListener('touchend',    onYTFsTouchEnd,   { passive: true });
     btn.addEventListener('touchcancel', onYTFsTouchEnd,   { passive: true });
     btn.addEventListener('touchmove',   onYTFsTouchMove,  { passive: true });
+    btn.addEventListener('contextmenu', onYTButtonContextMenu);
 }
-
 function detachYTLongPress() {
     if (!ytFsButton) return;
     ytFsButton.removeEventListener('touchstart',  onYTFsTouchStart);
     ytFsButton.removeEventListener('touchend',    onYTFsTouchEnd);
     ytFsButton.removeEventListener('touchcancel', onYTFsTouchEnd);
     ytFsButton.removeEventListener('touchmove',   onYTFsTouchMove);
+    ytFsButton.removeEventListener('contextmenu', onYTButtonContextMenu);
     ytFsButton = null;
-    if (ytLongPressTimer) { clearTimeout(ytLongPressTimer); ytLongPressTimer = null; }
+    if (ytLongPressTimer) {
+        clearTimeout(ytLongPressTimer);
+        ytLongPressTimer = null;
+    }
 }
 
-// ---- Desktop UI visibility -------------------------------------------
+// ---- Desktop: UI visibility ------------------------------------------
 function isUiPinned() {
     return uiHoverCount > 0 || uiFocusCount > 0;
 }
-
 function showDesktopButtons() {
     if (!btnContainer) return;
-
     btnContainer.style.opacity = '1';
     btnContainer.style.visibility = 'visible';
-
     if (uiHideTimer) {
         clearTimeout(uiHideTimer);
         uiHideTimer = null;
     }
-
     uiHideTimer = setTimeout(hideDesktopButtons, UI_HIDE_DELAY);
 }
-
 function hideDesktopButtons() {
     if (!btnContainer) return;
-
     uiHideTimer = null;
-
     if (isUiPinned()) return;
-
     btnContainer.style.opacity = '0';
     btnContainer.style.visibility = 'hidden';
 }
-
 function scheduleHideDesktopButtons() {
     if (uiHideTimer) {
         clearTimeout(uiHideTimer);
         uiHideTimer = null;
     }
-
     uiHideTimer = setTimeout(hideDesktopButtons, UI_HIDE_DELAY);
 }
-
 function attachUiInteractionListeners() {
     if (uiInteractionHandler) return;
-
     uiInteractionHandler = () => showDesktopButtons();
-
     document.addEventListener('mousemove', uiInteractionHandler, { capture: true, passive: true });
     document.addEventListener('keydown', uiInteractionHandler, { capture: true });
     document.addEventListener('touchstart', uiInteractionHandler, { capture: true, passive: true });
     document.addEventListener('pointerdown', uiInteractionHandler, { capture: true, passive: true });
 }
-
 function detachUiInteractionListeners() {
     if (!uiInteractionHandler) return;
-
     document.removeEventListener('mousemove', uiInteractionHandler, { capture: true });
     document.removeEventListener('keydown', uiInteractionHandler, { capture: true });
     document.removeEventListener('touchstart', uiInteractionHandler, { capture: true });
     document.removeEventListener('pointerdown', uiInteractionHandler, { capture: true });
-
     uiInteractionHandler = null;
 }
 
-// ---- Desktop: Hovering Buttons ---------------------------------------
+// ---- Desktop: Hovering buttons ---------------------------------------
 function createButton(text, svg, onClick) {
     const btn = document.createElement('button');
     btn.className = 'fs-action-btn';
     btn.style.cssText = `
-        background: rgba(28,28,28,0.8); color: #fff;
-        border: 0px; padding: 8px 14px;
-        border-radius: 28px; cursor: pointer; font-size: 14px; font-weight: 500;
-        opacity: 0.4; transition: opacity 0.2s, background 0.2s;
-        pointer-events: auto; backdrop-filter: blur(4px); font-family: sans-serif;
-        display: flex; align-items: center; gap: 6px; white-space: nowrap;
+    background: rgba(28,28,28,0.8); color: #fff;
+    border: 0px; padding: 8px 14px;
+    border-radius: 28px; cursor: pointer; font-size: 14px; font-weight: 500;
+    opacity: 0.4; transition: opacity 0.2s, background 0.2s;
+    pointer-events: auto; backdrop-filter: blur(4px); font-family: sans-serif;
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
     `;
-
     btn.innerHTML = svg + `<span>${text}</span>`;
-
     btn.addEventListener('mouseenter', () => {
         uiHoverCount++;
         btn.style.opacity = '1';
         showDesktopButtons();
     });
-
     btn.addEventListener('mouseleave', () => {
         uiHoverCount = Math.max(0, uiHoverCount - 1);
         btn.style.opacity = '0.4';
         scheduleHideDesktopButtons();
     });
-
     btn.addEventListener('focus', () => {
         uiFocusCount++;
         btn.style.opacity = '1';
         showDesktopButtons();
     });
-
     btn.addEventListener('blur', () => {
         uiFocusCount = Math.max(0, uiFocusCount - 1);
         btn.style.opacity = '0.4';
         scheduleHideDesktopButtons();
     });
-
     btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         showDesktopButtons();
         onClick();
     });
-
     return btn;
 }
-
 function updateDesktopButtons() {
     if (!btnContainer) return;
-
     uiHoverCount = 0;
     uiFocusCount = 0;
-
     btnContainer.innerHTML = '';
-
     if (currentMode !== 0) {
         const btnReset = createButton('Reset', svgReset, () => applyZoom(0));
         btnContainer.appendChild(btnReset);
         return;
     }
-
     if (is16x9Video && is16x9Screen) {
         const btnLetterbox = createButton('Remove Letterboxing', svgLetterbox, () => applyZoom(2));
         btnContainer.appendChild(btnLetterbox);
@@ -474,23 +474,19 @@ function updateDesktopButtons() {
         btnContainer.appendChild(btnFill);
     }
 }
-
 function createDesktopButtons(root) {
     if (btnContainer) return;
-
     btnContainer = document.createElement('div');
     btnContainer.id = 'fs-btn-container';
     btnContainer.style.cssText = `
-        position: fixed; right: 12px; top: 25%; transform: translateY(-25%);
-        z-index: 2147483647; display: flex; flex-direction: column; gap: 10px;
-        pointer-events: none;
-        opacity: 0; visibility: hidden;
-        transition: opacity 0.25s ease, visibility 0.25s;
+    position: fixed; right: 12px; top: 25%; transform: translateY(-25%);
+    z-index: 2147483647; display: flex; flex-direction: column; gap: 10px;
+    pointer-events: none;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s;
     `;
-
     root.appendChild(btnContainer);
 }
-
 function removeDesktopButtons() {
     if (btnContainer && btnContainer.parentNode) {
         btnContainer.parentNode.removeChild(btnContainer);
@@ -498,31 +494,100 @@ function removeDesktopButtons() {
     btnContainer = null;
 }
 
-// ---- YouTube: block context menu in fullscreen -----------------------
-function onContextMenu(e) {
-    if (isYouTube && fullscreenEl) { e.preventDefault(); e.stopPropagation(); }
+// ---- Apply settings on the fly ---------------------------------------
+function applyCenterVideos(enabled) {
+    if (!isActive) {
+        removeViewportFitCover();
+        return;
+    }
+    if (enabled) {
+        forceViewportFitCover();
+    } else {
+        removeViewportFitCover();
+    }
+}
+function applyPinchGestures(enabled) {
+    if (!isActive || !fullscreenEl) return;
+    if (enabled) {
+        detachGestureListeners(fullscreenEl);
+        pointers.clear();
+        pinchStartDist = null;
+        gestureDone = false;
+        attachGestureListeners(fullscreenEl);
+    } else {
+        detachGestureListeners(fullscreenEl);
+        pointers.clear();
+        pinchStartDist = null;
+        gestureDone = false;
+        if (videoEl && savedStyle) videoEl.style.touchAction = savedStyle.videoTouchAction;
+        if (fullscreenEl && savedStyle) fullscreenEl.style.touchAction = savedStyle.rootTouchAction;
+    }
+}
+function applyToggleButtons(enabled) {
+    if (!isActive || !fullscreenEl) return;
+    const shouldShow = enabled === isDesktop;
+    if (shouldShow) {
+        updateAspectRatios();
+        if (!btnContainer) {
+            createDesktopButtons(fullscreenEl);
+            updateDesktopButtons();
+            attachUiInteractionListeners();
+        }
+        showDesktopButtons();
+        if (videoEl && !videoResizeHandler) {
+            videoResizeHandler = () => {
+                updateAspectRatios();
+                if (currentMode === 0) {
+                    updateDesktopButtons();
+                } else {
+                    applyZoom(currentMode);
+                }
+            };
+            videoResizeHandler();
+            videoEl.addEventListener('loadedmetadata', videoResizeHandler, { once: true });
+            videoEl.addEventListener('resize', videoResizeHandler);
+        }
+    } else {
+        detachUiInteractionListeners();
+        if (uiHideTimer) {
+            clearTimeout(uiHideTimer);
+            uiHideTimer = null;
+        }
+        uiHoverCount = 0;
+        uiFocusCount = 0;
+        removeDesktopButtons();
+        if (!isDesktop && videoEl && videoResizeHandler) {
+            videoEl.removeEventListener('loadedmetadata', videoResizeHandler);
+            videoEl.removeEventListener('resize', videoResizeHandler);
+            videoResizeHandler = null;
+        }
+    }
+}
+function applyOverrideYouTube(enabled) {
+    if (!isActive || isDesktop || !isYouTube || !fullscreenEl) return;
+    if (enabled) {
+        attachYTLongPress();
+    } else {
+        detachYTLongPress();
+    }
 }
 
 // ---- Setup / teardown ------------------------------------------------
 function onResize() {
     updateAspectRatios();
-
     if (currentMode !== 0) {
         applyZoom(currentMode);
     } else {
         updateDesktopButtons();
     }
 }
-
 function setup(root) {
     const video = findVideo(root);
     if (!video) return;
-
     fullscreenEl = root;
     videoEl = video;
     zoomed = false;
     currentMode = 0;
-
     if (isYouTube) {
         targetEl = document.querySelector('.html5-video-container') || video;
         playerEl = document.querySelector('#movie_player') || root;
@@ -530,7 +595,6 @@ function setup(root) {
         targetEl = video;
         playerEl = root;
     }
-
     savedStyle = {
         targetTransform:  targetEl.style.transform,
         targetTransition: targetEl.style.transition,
@@ -542,7 +606,6 @@ function setup(root) {
         rootOverflow:     root.style.overflow,
         rootTouchAction:  root.style.touchAction,
     };
-
     if (isYouTube) {
         videoEl.style.opacity = '0.999';
         targetEl.style.willChange = 'transform';
@@ -551,14 +614,17 @@ function setup(root) {
         videoEl.style.willChange = 'transform';
         root.style.overflow = 'hidden';
     }
-
-    if (isDesktop) {
-        createDesktopButtons(root);
+    if (pinchGesturesEnabled) {
+        attachGestureListeners(root);
+    }
+    if (isDesktop || !toggleButtons) {
         updateAspectRatios();
-        updateDesktopButtons();
-        attachUiInteractionListeners();
-        showDesktopButtons();
-
+        if (toggleButtons === isDesktop) {
+            createDesktopButtons(root);
+            updateDesktopButtons();
+            attachUiInteractionListeners();
+            showDesktopButtons();
+        }
         videoResizeHandler = () => {
             updateAspectRatios();
             if (currentMode === 0) {
@@ -567,99 +633,59 @@ function setup(root) {
                 applyZoom(currentMode);
             }
         };
-
         videoResizeHandler();
         videoEl.addEventListener('loadedmetadata', videoResizeHandler, { once: true });
         videoEl.addEventListener('resize', videoResizeHandler);
-    } else {
-        setTouchAction(videoEl);
-        if (root !== videoEl) setTouchAction(root);
-
-        root.addEventListener('touchstart',  onTouchStart,  { capture: true, passive: false });
-        root.addEventListener('touchmove',   onTouchMove,   { capture: true, passive: false });
-        root.addEventListener('touchend',    onTouchEnd,    { capture: true, passive: true  });
-        root.addEventListener('touchcancel', onTouchEnd,    { capture: true, passive: true  });
-
-        if (window.PointerEvent) {
-            root.addEventListener('pointerdown',   onPointerDown,  { capture: true, passive: true });
-            root.addEventListener('pointermove',   onPointerMove,  { capture: true, passive: true });
-            root.addEventListener('pointerup',     onPointerEnd,   { capture: true, passive: true });
-            root.addEventListener('pointercancel', onPointerEnd,   { capture: true, passive: true });
-        }
-
-        if (isYouTube) {
+    }
+    if (!isDesktop) {
+        if (isYouTube && overrideYouTube) {
             attachYTLongPress();
             setTimeout(attachYTLongPress, 400);
             setTimeout(attachYTLongPress, 1200);
         }
     }
-
     window.addEventListener('resize', onResize);
 }
-
 function teardown() {
     if (zoomTimeoutId) {
         clearTimeout(zoomTimeoutId);
         zoomTimeoutId = null;
     }
-
-    if (isDesktop) {
+    detachGestureListeners(fullscreenEl);
+    if (isDesktop || !toggleButtons) {
         detachUiInteractionListeners();
-
         if (uiHideTimer) {
             clearTimeout(uiHideTimer);
             uiHideTimer = null;
         }
-
         uiHoverCount = 0;
         uiFocusCount = 0;
-
         removeDesktopButtons();
-
         if (videoEl && videoResizeHandler) {
             videoEl.removeEventListener('loadedmetadata', videoResizeHandler);
             videoEl.removeEventListener('resize', videoResizeHandler);
             videoResizeHandler = null;
         }
-    } else {
-        if (fullscreenEl) {
-            fullscreenEl.removeEventListener('touchstart',  onTouchStart,  { capture: true });
-            fullscreenEl.removeEventListener('touchmove',   onTouchMove,   { capture: true });
-            fullscreenEl.removeEventListener('touchend',    onTouchEnd,    { capture: true });
-            fullscreenEl.removeEventListener('touchcancel', onTouchEnd,    { capture: true });
-
-            if (window.PointerEvent) {
-                fullscreenEl.removeEventListener('pointerdown',   onPointerDown,  { capture: true });
-                fullscreenEl.removeEventListener('pointermove',   onPointerMove,  { capture: true });
-                fullscreenEl.removeEventListener('pointerup',     onPointerEnd,   { capture: true });
-                fullscreenEl.removeEventListener('pointercancel', onPointerEnd,   { capture: true });
-            }
-        }
-
+    }
+    if (!isDesktop) {
         if (isYouTube) detachYTLongPress();
     }
-
     window.removeEventListener('resize', onResize);
-
     if (targetEl && savedStyle) {
         targetEl.style.transform = savedStyle.targetTransform;
         targetEl.style.transition = savedStyle.targetTransition;
         targetEl.style.transformOrigin = savedStyle.targetOrigin;
         targetEl.style.willChange = savedStyle.videoWillChange;
     }
-
     if (videoEl && savedStyle) {
         videoEl.style.opacity = savedStyle.videoOpacity;
         videoEl.style.touchAction = savedStyle.videoTouchAction;
     }
-
     if (playerEl && savedStyle) playerEl.style.overflow = savedStyle.playerOverflow;
-
     if (fullscreenEl && savedStyle) {
         fullscreenEl.style.overflow = savedStyle.rootOverflow;
         fullscreenEl.style.touchAction = savedStyle.rootTouchAction;
     }
-
     fullscreenEl = null;
     videoEl = null;
     targetEl = null;
@@ -674,8 +700,8 @@ function teardown() {
 
 // ---- Fullscreen lifecycle --------------------------------------------
 function onFullscreenChange() {
+    if (!isActive) return;
     const root = currentFullscreenElement();
-
     if (root) {
         if (fullscreenEl) teardown();
         setup(root);
@@ -685,59 +711,131 @@ function onFullscreenChange() {
     }
 }
 
-// ---- Force viewport-fit=cover ----------------------------------------
+// ---- Universal: Force viewport-fit=cover ----------------------------
+function cleanViewportContent(content) {
+    return (content || '')
+    .replace(/viewport-fit\s*=\s*[^,;\s]+/gi, '')
+    .replace(/,\s*,/g, ',')
+    .replace(/^,|,$/g, '')
+    .trim();
+}
 function forceViewportFitCover() {
     let meta = document.querySelector('meta[name="viewport"]');
-
     if (meta) {
-        let content = meta.getAttribute('content') || '';
-        content = content.replace(/viewport-fit\s*=\s*[^,;\s]+/gi, '')
-                         .replace(/,\s*,/g, ',')
-                         .replace(/^,|,$/g, '')
-                         .trim();
-
+        if (!viewportModified) {
+            originalViewportContent = meta.getAttribute('content');
+            viewportCreated = false;
+            viewportModified = true;
+        }
+        const content = cleanViewportContent(meta.getAttribute('content'));
         meta.setAttribute('content', (content ? content + ', ' : '') + 'viewport-fit=cover');
     } else {
+        if (!viewportModified) {
+            originalViewportContent = null;
+            viewportCreated = true;
+            viewportModified = true;
+        }
         meta = document.createElement('meta');
         meta.name = 'viewport';
         meta.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
         (document.head || document.documentElement).appendChild(meta);
     }
 }
+function removeViewportFitCover() {
+    if (!viewportModified) return;
+    const meta = document.querySelector('meta[name="viewport"]');
+    if (viewportCreated) {
+        if (meta && meta.parentNode) meta.parentNode.removeChild(meta);
+    } else if (meta) {
+        if (originalViewportContent === null) {
+            const content = cleanViewportContent(meta.getAttribute('content'));
+            if (content) {
+                meta.setAttribute('content', content);
+            } else {
+                meta.removeAttribute('content');
+            }
+        } else {
+            meta.setAttribute('content', originalViewportContent);
+        }
+    }
+    viewportModified = false;
+    viewportCreated = false;
+    originalViewportContent = null;
+}
+
+// ---- Activation / deactivation ---------------------------------------
+function activate() {
+    if (isActive) return;
+    isActive = true;
+    if (centerVideos) forceViewportFitCover();
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    if (currentFullscreenElement()) onFullscreenChange();
+}
+function deactivate() {
+    if (!isActive) return;
+    isActive = false;
+    document.removeEventListener('fullscreenchange', onFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+    if (fullscreenEl) teardown();
+    removeViewportFitCover();
+}
 
 // ---- Boot ------------------------------------------------------------
-chrome.storage.sync.get(
-    { mode: 'deny', allowList: [], denyList: [], capTaller: true, capWider: true },
-    (settings) => {
-        if (!isSiteEnabled(settings)) return;
+chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
+    currentSettings = settings;
+    capTallerLimit = settings.capTaller;
+    capWiderLimit = settings.capWider;
+    centerVideos = settings.centerVideos;
+    pinchGesturesEnabled = settings.pinchGestures;
+    toggleButtons = settings.toggleButtons;
+    overrideYouTube = settings.overrideYouTube;
+    if (isSiteEnabled(currentSettings)) activate();
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== 'sync') return;
+        for (const key in changes) {
+            if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) {
+                currentSettings[key] = (typeof changes[key].newValue === 'undefined')
+                ? DEFAULT_SETTINGS[key]
+                : changes[key].newValue;
+            }
+        }
+        capTallerLimit = currentSettings.capTaller;
+        capWiderLimit = currentSettings.capWider;
+        centerVideos = currentSettings.centerVideos;
+        pinchGesturesEnabled = currentSettings.pinchGestures;
+        toggleButtons = currentSettings.toggleButtons;
+        overrideYouTube = currentSettings.overrideYouTube;
+        const wasActive = isActive;
+        const nowEnabled = isSiteEnabled(currentSettings);
+        if (nowEnabled && !isActive) {
+            activate();
+        } else if (!nowEnabled && isActive) {
+            deactivate();
+        }
+        if (isActive && wasActive) {
+            if (changes.centerVideos) applyCenterVideos(centerVideos);
+            if (changes.pinchGestures) applyPinchGestures(pinchGesturesEnabled);
+            if (changes.toggleButtons) applyToggleButtons(toggleButtons);
+            if (changes.overrideYouTube) applyOverrideYouTube(overrideYouTube);
+            if ((changes.capTaller || changes.capWider) && fullscreenEl && currentMode !== 0) {
+                applyZoom(currentMode);
+            }
+        }
+    });
+});
 
-        capTallerLimit = settings.capTaller;
-        capWiderLimit = settings.capWider;
-
-        forceViewportFitCover();
-
-        document.addEventListener('fullscreenchange', onFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-        document.addEventListener('contextmenu', onContextMenu, true);
-
-        if (currentFullscreenElement()) onFullscreenChange();
-    }
-);
-
-// ---- Keyboard Shortcuts Handler --------------------------------------
+// ---- Desktop: Keyboard shortcuts handler -----------------------------
 function handleShortcut(type) {
-    if (!videoEl || !isDesktop) return;
-
+    if (!isActive || !videoEl || !isDesktop) return;
     const isFillPresent = currentMode === 1 || (currentMode === 0 && !(is16x9Video && is16x9Screen));
     const isLetterboxPresent = currentMode === 2 || (currentMode === 0 && is16x9Video && (is16x9Screen || isTallerHorizontalScreen));
-
     if (type === 'fill' && isFillPresent) {
         applyZoom(currentMode === 1 ? 0 : 1);
     } else if (type === 'letterbox' && isLetterboxPresent) {
         applyZoom(currentMode === 2 ? 0 : 2);
     }
 }
-
 chrome.runtime.onMessage.addListener((request) => {
     if (request.action === 'fill-screen') {
         handleShortcut('fill');
@@ -745,5 +843,4 @@ chrome.runtime.onMessage.addListener((request) => {
         handleShortcut('letterbox');
     }
 });
-
 })();

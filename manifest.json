@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fill Screen Anywhere",
-  "version": "1.5",
+  "version": "1.6",
   "author": "Farid Zelli",
   "homepage_url": "https://github.com/FaridZelli/FillScreenAnywhere",
   "description": "Zoom into videos on almost any website.",
