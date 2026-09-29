@@ -33,12 +33,13 @@ Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/Fill
   <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="">
 </picture>
 
+<img src="github-content/preview-extension.jpg" alt="">
+
 <picture>
   <source media="(min-width: 769px)" srcset="github-content/preview-desktop.jpg">
   <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="">
 </picture>
-  
-  
+
 ## Special thanks
   
 [Tabler Icons](https://github.com/tabler/tabler-icons)
