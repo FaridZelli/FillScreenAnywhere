@@ -17,8 +17,8 @@ Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/Fill
 - IronFox: Enable "Allow for all sites" permission after installation
 
 ## Desktop usage
-- Fill Screen: <kbd>Ctrl+Alt+F</kbd>
-- Remove Letterboxing: <kbd>Ctrl+Alt+L</kbd>
+- Fill Screen: `Ctrl+Alt+F`
+- Remove Letterboxing: `Ctrl+Alt+L`
 > See [Manage extension shortcuts in Firefox](https://support.mozilla.org/en-US/kb/manage-extension-shortcuts-firefox) for more info.
 
 ## Features
