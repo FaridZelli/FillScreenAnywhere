@@ -11,10 +11,12 @@ A browser extension that allows you to zoom into videos across numerous streamin
 ## Browser compatibility
 Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/FillScreenAnywhere/releases/latest) for XPI/CRX files).
 
+> [!NOTE]
+> On hardened browsers, enable the "Allow for all sites" permission after installation.
+
 ## Mobile usage
-- Pinch out on your screen anywhere
+- Pinch in and out on your screen anywhere
 - Long press the full screen button on YouTube
-- IronFox: Enable "Allow for all sites" permission after installation
 
 ## Desktop usage
 - Fill Screen: `Ctrl+Alt+F`
@@ -23,8 +25,10 @@ Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/Fill
 
 ## Features
 - Website allow/deny list
+- Center all videos (mainly for Chromium-based mobile browsers)
 - Limit crop ratio for ultra-wide or standard content
 - Remove 16:9 letterboxing from 21:9 content
+- And much more...
 
 ---
 
