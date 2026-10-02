@@ -721,7 +721,7 @@
     function applySettings(loadedSettings) {
         settings = loadedSettings;
         const siteEnabled = isSiteEnabled();
-        syncFeature(startViewport, inFullscreen && settings.centerVideos);
+        syncFeature(startViewport, siteEnabled && settings.centerVideos);
         syncFeature(startFullscreenListener, siteEnabled);
         syncFeatures();
         refreshZoom();
