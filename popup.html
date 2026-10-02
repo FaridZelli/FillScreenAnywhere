@@ -6,6 +6,7 @@
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
+
   body {
     margin: 0;
     padding: 16px;
@@ -16,29 +17,33 @@
     align-items: center;
     justify-content: center;
   }
+
   .popup-content {
     width: 100%;
-    min-width: 300px;
-    max-width: 440px;
+    min-width: 360px;
+    max-width: 360px;
   }
+
   h1 {
     font-size: 1.5em;
     margin: 0 0 0.4em;
     font-weight: 600;
   }
+
   .row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 0.75em;
   }
+
   .seg {
     display: flex;
     background: #2c2c2e;
     border-radius: 8px;
     margin-bottom: 1em;
   }
+
   .seg button {
     flex: 1;
     padding: 0.5em 0;
@@ -51,10 +56,12 @@
     font-weight: 500;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
+
   .seg button.active {
     background: #ff5500;
     color: #fff;
   }
+
   textarea {
     width: 100%;
     min-height: 8.5em;
@@ -67,21 +74,31 @@
     font: 0.92em/1.4 monospace;
     transition: border-color 0.3s ease;
   }
+
   textarea:focus {
     border-color: #ffffff;
     outline: none;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
   }
+
   .hint {
+    color: #8e8e93;
+    font-size: 0.85em;
+    margin: 0.25em 0 1em;
+  }
+
+  .hint-list {
     color: #8e8e93;
     font-size: 0.85em;
     margin: 1em 0 1em;
   }
+
   hr {
     border: 0;
     border-top: 1px solid #2c2c2e;
     margin: 1em 0;
   }
+
   .switch {
     position: relative;
     display: inline-block;
@@ -90,6 +107,7 @@
     flex-shrink: 0;
     cursor: pointer;
   }
+
   .switch input {
     position: absolute;
     opacity: 0;
@@ -98,6 +116,7 @@
     margin: 0;
     cursor: pointer;
   }
+
   .slider {
     position: absolute;
     inset: 0;
@@ -106,6 +125,7 @@
     transition: .2s;
     pointer-events: none;
   }
+
   .slider::before {
     content: "";
     position: absolute;
@@ -117,8 +137,15 @@
     border-radius: 50%;
     transition: .2s;
   }
-  input:checked + .slider { background: #ff5500; }
-  input:checked + .slider::before { transform: translateX(15px); }
+
+  input:checked + .slider {
+    background: #ff5500;
+  }
+
+  input:checked + .slider::before {
+    transform: translateX(15px);
+  }
+
   .restore-btn {
     width: 100%;
     padding: 0.65em 0;
@@ -131,18 +158,54 @@
     font-weight: 600;
     transition: background-color 0.3s ease, border-color 0.3s ease;
   }
+
   @media (hover: hover) {
     .restore-btn:hover {
       background: #3a3a3c;
       border-color: #4a4a4c;
     }
   }
+
   .restore-btn:active {
     background: #3a3a3c;
     border-color: #4a4a4c;
   }
 
-  html.is-mobile body {
+  details.advanced-options summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: #ff5500;
+    user-select: none;
+    outline: none;
+    list-style: none;
+    padding-bottom: 0.25em;
+  }
+
+  details.advanced-options summary::-webkit-details-marker {
+    display: none;
+  }
+
+  details.advanced-options summary::marker {
+    content: "";
+    display: none;
+  }
+
+  details.advanced-options summary::before {
+    content: "▶ ";
+    display: inline-block;
+    transition: transform 0.2s;
+    margin-right: 4px;
+  }
+
+  details.advanced-options[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  details.advanced-options .hint:last-child {
+    margin-bottom: 0;
+  }
+
+  html.is-small body {
     min-height: 100%;
     display: flex;
     align-items: center;
@@ -151,32 +214,24 @@
              max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
     font-size: 16px;
   }
-  html.is-mobile .popup-content {
+
+  html.is-small .popup-content {
     width: 100%;
     max-width: 420px;
   }
-  html.is-mobile .switch {
+
+  html.is-small .switch {
     width: 46px;
     height: 26px;
   }
-  html.is-mobile .slider::before {
+
+  html.is-small .slider::before {
     width: 22px;
     height: 22px;
   }
-  html.is-mobile input:checked + .slider::before {
+
+  html.is-small input:checked + .slider::before {
     transform: translateX(20px);
-  }
-
-  html.is-mobile h1 {
-    display: none;
-  }
-
-  html.is-mobile .mobile-hide {
-    display: none;
-  }
-
-   html.is-desktop .desktop-hide {
-    display: none;
   }
 
   .github-link {
@@ -194,10 +249,10 @@
   }
 
   .app-icon {
-  width: 3em;
-  height: 3em;
-  margin-bottom: 1em;
-  display: block;
+    width: 3em;
+    height: 3em;
+    margin-bottom: 1em;
+    display: block;
   }
 </style>
 </head>
@@ -206,45 +261,86 @@
     <img src="fillscreenanywhere.svg" alt="" class="app-icon">
     <h1>Fill Screen Anywhere</h1>
     <a href="https://github.com/FaridZelli/FillScreenAnywhere" target="_blank" class="github-link">Star on GitHub</a>
+
     <div class="seg">
       <button id="modeDeny" class="active">Deny list</button>
       <button id="modeAllow">Allow list</button>
     </div>
+
     <textarea id="denyList" placeholder="example.com"></textarea>
     <textarea id="allowList" placeholder="example.com" style="display:none"></textarea>
-    <div class="hint" id="listHint">Runs on every website except these.</div>
+    <div class="hint-list" id="listHint"></div>
+
     <hr>
+
     <div class="row">
-      <label for="centerVideos">Center all videos</label>
-      <div class="switch"><input type="checkbox" id="centerVideos" checked><span class="slider"></span></div>
+      <label for="alwaysFillScreen">Always fill the screen</label>
+      <div class="switch"><input type="checkbox" id="alwaysFillScreen"><span class="slider"></span></div>
     </div>
+    <div class="hint">Automatically zoom-in when entering fullscreen.</div>
+
     <div class="row">
-      <label for="pinchGestures">Enable pinch gestures</label>
-      <div class="switch"><input type="checkbox" id="pinchGestures" checked><span class="slider"></span></div>
+      <label for="backgroundPlay">Enable background play</label>
+      <div class="switch"><input type="checkbox" id="backgroundPlay"><span class="slider"></span></div>
     </div>
-    <div class="row">
-      <label for="toggleButtons">
-        <span class="mobile-hide">Show on-screen buttons</span>
-        <span class="desktop-hide">Hide on-screen buttons</span>
-      </label>
-      <div class="switch"><input type="checkbox" id="toggleButtons" checked><span class="slider"></span></div>
-    </div>
-    <div class="row desktop-hide">
-      <label for="overrideYouTube">Enable YouTube overrides</label>
-      <div class="switch"><input type="checkbox" id="overrideYouTube" checked><span class="slider"></span></div>
-    </div>
-    <div class="row">
-      <label for="capTaller">Limit crop on 3:2 or taller videos</label>
-      <div class="switch"><input type="checkbox" id="capTaller" checked><span class="slider"></span></div>
-    </div>
-    <div class="row">
-      <label for="capWider">Limit crop on 2:1 or wider videos</label>
-      <div class="switch"><input type="checkbox" id="capWider" checked><span class="slider"></span></div>
-    </div>
+    <div class="hint">Keep playing videos while using other apps.</div>
+
     <hr>
+
+    <details class="advanced-options" id="advancedOptionsMenu">
+      <summary>Show advanced options</summary>
+
+      <hr>
+
+      <div class="row">
+        <label for="centerVideos">Center all videos</label>
+        <div class="switch"><input type="checkbox" id="centerVideos" checked><span class="slider"></span></div>
+      </div>
+      <div class="hint">Force viewport-fit=cover to remove black bars.</div>
+
+      <div class="row">
+        <label for="pinchGestures">Enable pinch gestures</label>
+        <div class="switch"><input type="checkbox" id="pinchGestures" checked><span class="slider"></span></div>
+      </div>
+      <div class="hint">Zoom in and out on touchscreens.</div>
+
+      <div class="row">
+        <label for="zoomAnimation">Enable zoom animations</label>
+        <div class="switch"><input type="checkbox" id="zoomAnimation" checked><span class="slider"></span></div>
+      </div>
+      <div class="hint">Smoothly transition in and out of zoom states.</div>
+
+      <div class="row">
+        <label for="hideButtons">Hide on-screen buttons</label>
+        <div class="switch"><input type="checkbox" id="hideButtons"><span class="slider"></span></div>
+      </div>
+      <div class="hint">Do not show overlay buttons on the video player.</div>
+
+      <div class="row">
+        <label for="overrideYouTube">Enable YouTube overrides</label>
+        <div class="switch"><input type="checkbox" id="overrideYouTube"><span class="slider"></span></div>
+      </div>
+      <div class="hint">Long-press the fullscreen button to zoom.</div>
+
+      <div class="row">
+        <label for="capTaller">Limit crop on 3:2 or taller videos</label>
+        <div class="switch"><input type="checkbox" id="capTaller" checked><span class="slider"></span></div>
+      </div>
+      <div class="hint">Prevent excessive horizontal cropping.</div>
+
+      <div class="row">
+        <label for="capWider">Limit crop on 2:1 or wider videos</label>
+        <div class="switch"><input type="checkbox" id="capWider" checked><span class="slider"></span></div>
+      </div>
+      <div class="hint">Prevent excessive vertical cropping.</div>
+    </details>
+
+    <hr>
+
     <button id="restoreDefaults" class="restore-btn">Restore Defaults</button>
-    <div class="hint desktop-hide">Hint:<br>You can long-press the full-screen button on YouTube to fill the screen when overrides are enabled.</div>
   </div>
+
+  <script src="defaults.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
