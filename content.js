@@ -160,7 +160,6 @@
     function syncFeatures() {
         const inFullscreen = Boolean(fullscreenEl);
         syncFeature(startSession, inFullscreen);
-        syncFeature(startViewport, inFullscreen && settings.centerVideos);
         syncFeature(startGestures, inFullscreen && settings.pinchGestures);
         syncFeature(startButtons, inFullscreen && !settings.hideButtons);
         syncFeature(startYouTubeOverrides, inFullscreen && isYouTube && settings.overrideYouTube);
@@ -436,7 +435,7 @@
         return directives.join(', ');
     }
 
-    // Forces viewport-fit=cover while a video is fullscreen. Stopping it restores or removes the viewport meta tag.
+    // Forces viewport-fit=cover for as long as the extension is enabled on the page. Stopping it restores or removes the viewport meta tag.
     function startViewport(signal) {
         let meta = document.querySelector('meta[name="viewport"]');
         const created = !meta;
@@ -722,6 +721,7 @@
     function applySettings(loadedSettings) {
         settings = loadedSettings;
         const siteEnabled = isSiteEnabled();
+        syncFeature(startViewport, inFullscreen && settings.centerVideos);
         syncFeature(startFullscreenListener, siteEnabled);
         syncFeatures();
         refreshZoom();
