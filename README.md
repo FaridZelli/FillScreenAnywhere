@@ -28,6 +28,7 @@ Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/Fill
 - Center all videos (mainly for Chromium-based mobile browsers)
 - Limit crop ratio for ultra-wide or standard content
 - Remove 16:9 letterboxing from 21:9 content
+- Play videos in the background
 - And much more...
 
 ---
