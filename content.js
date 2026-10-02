@@ -170,6 +170,7 @@
 
     // Tells whether the current hostname equals a list entry or is a subdomain of it.
     function hostMatches(entry) {
+        if (typeof entry !== 'string') return false;
         const domain = entry.trim().toLowerCase();
         if (!domain) return false;
         return hostname === domain || hostname.endsWith('.' + domain);
