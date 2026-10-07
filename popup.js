@@ -80,3 +80,10 @@ loadSettings((settings, isLargeScreen) => {
 
     document.documentElement.style.visibility = '';
 });
+
+// Opens external links in a new browser tab
+document.getElementById('openLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    browser.tabs.create({ url: e.currentTarget.href });
+    window.close();
+});
