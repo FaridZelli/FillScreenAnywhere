@@ -1,8 +1,8 @@
 # Fill Screen Anywhere 
-[![Mozilla Add-on Users](https://img.shields.io/amo/users/FillScreenAnywhere%40FaridZelli?style=for-the-badge&logo=firefoxbrowser&logoColor=white&labelColor=orange&color=gold&cacheSeconds=86400)](https://addons.mozilla.org/en-US/firefox/addon/fillscreen/)
+[![Firefox Add-ons Users](https://img.shields.io/amo/users/FillScreenAnywhere%40FaridZelli?style=for-the-badge&logo=firefoxbrowser&label=firefox%20users&logoColor=white&labelColor=orange&color=gold&cacheSeconds=86400)](https://addons.mozilla.org/en-US/firefox/addon/fillscreen/)
   
   
-[![Mozilla Add-on Stars](https://img.shields.io/amo/stars/FillScreenAnywhere%40FaridZelli?style=for-the-badge&logo=mozilla&labelColor=black&color=gold&cacheSeconds=86400)](https://addons.mozilla.org/en-US/firefox/addon/fillscreen/)
+[![Firefox Add-ons Stars](https://img.shields.io/amo/stars/FillScreenAnywhere%40FaridZelli?style=for-the-badge&logo=mozilla&label=amo%20stars&labelColor=black&color=gold&cacheSeconds=86400)](https://addons.mozilla.org/en-US/firefox/addon/fillscreen/)
 
 ---
 
