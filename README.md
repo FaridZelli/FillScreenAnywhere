@@ -33,17 +33,11 @@ Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/Fill
 
 ---
 
-<picture>
-  <source media="(max-width: 768px)" srcset="github-content/preview-mobile.jpg">
-  <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="">
-</picture>
-
-<img src="github-content/preview-extension.jpg" alt="">
-
-<picture>
-  <source media="(min-width: 769px)" srcset="github-content/preview-desktop.jpg">
-  <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="">
-</picture>
+![Showcase Image 1](github-content/mozilla-addons-1.jpg)
+![Showcase Image 2](github-content/mozilla-addons-2.jpg)
+![Showcase Image 3](github-content/mozilla-addons-3.jpg)
+![Showcase Image 4](github-content/mozilla-addons-4.jpg)
+![Showcase Image 5](github-content/mozilla-addons-5.jpg)
 
 ## Special thanks
   
