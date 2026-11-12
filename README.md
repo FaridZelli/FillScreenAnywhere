@@ -15,8 +15,8 @@ Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/Fill
 > On hardened browsers, enable the "Allow for all sites" permission after installation.
 
 ## Mobile usage
-- Pinch in and out on your screen anywhere
-- Long press the full screen button on YouTube
+- Pinch in and out on your screen to toggle zoom
+- Long press the full screen button to remove letterboxing (YouTube only)
 
 ## Desktop usage
 - Fill Screen: `Ctrl+Alt+F`
