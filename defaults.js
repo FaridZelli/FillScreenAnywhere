@@ -63,12 +63,15 @@ const YOUTUBE_ZOOM_CONTAINER_SELECTOR = '.html5-video-container';
 // Sets the key under which the large or small screen decision is stored. The decision is made once and never changes.
 const LARGE_SCREEN_STORAGE_KEY = 'isLargeScreen';
 
+// Sets the key under which the last zoom mode is stored.
+const LAST_ZOOM_STORAGE_KEY = 'lastZoomMode';
+
 // Defines the default settings that do not depend on the screen size.
 const DEFAULT_SETTINGS = Object.freeze({
     mode: 'deny',
     allowList: [],
     denyList: [],
-    alwaysFillScreen: false,
+    rememberZoom: false,
     backgroundPlay: false,
     centerVideos: true,
     pinchGestures: true,

@@ -25,6 +25,7 @@
     // ---- Constants -------------------------------------------------------
 
     // Identifies the zoom mode in which the video shows at its natural size.
+    // The zoom mode values are stored under LAST_ZOOM_STORAGE_KEY, so they must never change.
     const ZOOM_NONE = 0;
 
     // Identifies the zoom mode that fills the screen with the video.
@@ -32,6 +33,11 @@
 
     // Identifies the zoom mode that crops the letterbox bars off the video.
     const ZOOM_LETTERBOX = 2;
+
+    // Turns a stored value into a zoom mode. Anything that is not a known zoom-in mode counts as ZOOM_NONE, so corrupted storage never reaches the extension.
+    function toZoomMode(value) {
+        return value === ZOOM_FILL || value === ZOOM_LETTERBOX ? value : ZOOM_NONE;
+    }
 
     // Maps the command names declared in manifest.json to the zoom modes that they toggle.
     const COMMAND_ZOOM_MODES = {
@@ -96,8 +102,12 @@
     // Holds the current zoom mode.
     let zoomMode = ZOOM_NONE;
 
-    // Tells whether the next possible zoom should still fill the screen automatically.
-    let autoFillPending = false;
+    // Holds the remembered zoom mode that should still be applied automatically as soon as it becomes available, or ZOOM_NONE when nothing is pending.
+    let pendingZoomMode = ZOOM_NONE;
+
+    // Holds the remembered zoom mode, which is the last zoom mode that the user chose.
+    // It is kept in memory so that entering fullscreen can apply it instantly, and it follows the stored value across frames and tabs.
+    let lastZoomMode = ZOOM_NONE;
 
     // Holds the timer that restores the temporary zoom styles once the zoom-out animation ends.
     let zoomCleanupTimer = null;
@@ -116,6 +126,18 @@
 
     // Holds the identifiers of the touch pointers that are currently down.
     const touchPointers = new Set();
+
+    // Tells whether a multi-finger touch gesture is in progress, so that YouTube must not see the rest of its touch events.
+    let hidingTouchesFromYouTube = false;
+
+    // Tells whether a multi-finger pointer gesture is in progress, so that YouTube must not see the rest of its pointer events.
+    let hidingPointersFromYouTube = false;
+
+    // Holds the touch that YouTube saw start, as its target and Touch object, so that the touch can be cancelled for YouTube. It is null when there is nothing to cancel.
+    let youTubeFirstTouch = null;
+
+    // Holds the touch pointer that YouTube saw start, as its target and pointer identifier, so that the pointer can be cancelled for YouTube. It is null when there is nothing to cancel.
+    let youTubeFirstPointer = null;
 
     // Holds the timer that recognizes a long press on the YouTube fullscreen button.
     let longPressTimer = null;
@@ -157,12 +179,15 @@
     }
 
     // Brings every fullscreen feature in line with the settings and with whether a fullscreen video is playing.
+    // The YouTube gesture block must be synced after the pinch gestures, because its listeners have to be registered after theirs.
     function syncFeatures() {
         const inFullscreen = Boolean(fullscreenEl);
+        const onYouTube = inFullscreen && isYouTube && settings.overrideYouTube;
         syncFeature(startSession, inFullscreen);
         syncFeature(startGestures, inFullscreen && settings.pinchGestures);
         syncFeature(startButtons, inFullscreen && !settings.hideButtons);
-        syncFeature(startYouTubeOverrides, inFullscreen && isYouTube && settings.overrideYouTube);
+        syncFeature(startYouTubeOverrides, onYouTube);
+        syncFeature(startYouTubeGestureBlock, onYouTube && settings.pinchGestures);
     }
 
     // ---- Site matching ---------------------------------------------------
@@ -370,10 +395,22 @@
         updateButtons();
     }
 
+    // Stores the zoom mode that the user chose, so that the next fullscreen session can pick up where this one left off.
+    // Nothing is stored while the remember zoom state setting is off.
+    function saveZoomMode(mode) {
+        if (!settings.rememberZoom) return;
+        lastZoomMode = mode;
+        chrome.storage.local.set({ [LAST_ZOOM_STORAGE_KEY]: mode });
+    }
+
     // Applies a zoom mode that the user requested. The animation follows the zoom animation setting.
+    // The zoom mode is remembered only when the request changed it, so that a request that cannot zoom the video does not erase the remembered mode.
+    // The user's choice replaces any pending automatic zoom. The automatic zoom and the layout refreshes never reach this function, so only the user's own choices are remembered.
     function setZoom(mode) {
-        autoFillPending = false;
+        pendingZoomMode = ZOOM_NONE;
+        const previousMode = zoomMode;
         applyZoom(mode, settings.zoomAnimation);
+        if (zoomMode !== previousMode) saveZoomMode(zoomMode);
     }
 
     // Switches a zoom mode on when no zoom is active, and switches it off when it is the active mode.
@@ -385,14 +422,16 @@
         }
     }
 
-    // Brings the zoom in line with the current layout without animation. It also performs the automatic fill as soon as filling becomes available.
+    // Brings the zoom in line with the current layout without animation. It also applies the remembered zoom mode as soon as that mode becomes available for the video.
+    // Until then the video simply stays zoomed out, and the stored mode is left untouched.
     function refreshZoom() {
         if (!fullscreenEl) return;
-        if (autoFillPending && zoomMode === ZOOM_NONE) {
+        if (pendingZoomMode !== ZOOM_NONE && zoomMode === ZOOM_NONE) {
             const video = findVideo(fullscreenEl);
-            if (video && getZoomScale(ZOOM_FILL, video) > ZOOM_THRESHOLD) {
-                autoFillPending = false;
-                applyZoom(ZOOM_FILL, false);
+            if (video && getZoomScale(pendingZoomMode, video) > ZOOM_THRESHOLD) {
+                const mode = pendingZoomMode;
+                pendingZoomMode = ZOOM_NONE;
+                applyZoom(mode, false);
                 return;
             }
         }
@@ -408,15 +447,22 @@
     // Prepares the fullscreen element and the video for zooming, and keeps the zoom in line with size changes. Stopping it restores every modified style.
     function startSession(signal) {
         const video = findVideo(fullscreenEl);
+        const target = getZoomTarget(video);
         setStyle(fullscreenEl, 'overflow', 'hidden');
-        setStyle(getZoomTarget(video), 'will-change', 'transform');
+        setStyle(target, 'will-change', 'transform');
 
-        // Refreshes the zoom whenever the window or the video changes size. Media events do not bubble, so they are captured.
+        // Refreshes the zoom whenever the window or the video changes size.
         listenCapture(window, 'resize', refreshZoom, signal);
         listenCapture(fullscreenEl, 'loadedmetadata', refreshZoom, signal);
         listenCapture(fullscreenEl, 'resize', refreshZoom, signal);
 
+        // Refreshes the zoom whenever the layout box of the video or the zoom target changes size.
+        const resizeObserver = new ResizeObserver(() => refreshZoom());
+        resizeObserver.observe(video);
+        if (target !== video) resizeObserver.observe(target);
+
         onStop(signal, () => {
+            resizeObserver.disconnect();
             clearTimeout(zoomCleanupTimer);
             zoomCleanupTimer = null;
             restoreAllStyles();
@@ -462,11 +508,6 @@
 
     // ---- Feature: pinch gestures -----------------------------------------
 
-    // Tells whether pinch handling is paused because the YouTube overrides are running.
-    function isPinchSuppressed() {
-        return runningFeatures.has(startYouTubeOverrides);
-    }
-
     // Cancels the default behavior of a touch event and hides it from the page.
     function blockTouchEvent(event) {
         if (event.cancelable) event.preventDefault();
@@ -475,11 +516,11 @@
 
     // Starts tracking a pinch when exactly two fingers touch the screen.
     function onTouchStart(event) {
-        if (isPinchSuppressed()) return;
         if (event.touches.length === 2) {
             blockTouchEvent(event);
             pinchStartDistance = touchDistance(event.touches[0], event.touches[1]);
             gestureDone = false;
+            cancelYouTubeTouch();
         } else {
             pinchStartDistance = null;
         }
@@ -487,7 +528,7 @@
 
     // Zooms in when the fingers spread apart and zooms out when they pinch together, once per gesture.
     function onTouchMove(event) {
-        if (isPinchSuppressed() || event.touches.length !== 2) return;
+        if (event.touches.length !== 2) return;
         blockTouchEvent(event);
         if (pinchStartDistance === null || gestureDone) return;
         const delta = touchDistance(event.touches[0], event.touches[1]) - pinchStartDistance;
@@ -500,9 +541,9 @@
         }
     }
 
-    // Ends the current pinch when fewer than two fingers remain on the screen.
+    // Ends the current pinch when fewer than two fingers remain on the screen. It ignores the cancellations that the extension sends to YouTube.
     function onTouchEnd(event) {
-        if (event.touches.length < 2) {
+        if (event.isTrusted && event.touches.length < 2) {
             pinchStartDistance = null;
             gestureDone = false;
         }
@@ -513,6 +554,7 @@
         if (event.pointerType !== 'touch') return;
         touchPointers.add(event.pointerId);
         if (touchPointers.size >= 2) event.stopImmediatePropagation();
+        if (touchPointers.size === 2) cancelYouTubeTouch();
     }
 
     // Hides pointer movement from the page while several touch pointers are down.
@@ -521,9 +563,9 @@
         event.stopImmediatePropagation();
     }
 
-    // Stops tracking a touch pointer that was lifted or cancelled.
+    // Stops tracking a touch pointer that was lifted or cancelled. It ignores the cancellations that the extension sends to YouTube.
     function onPointerEnd(event) {
-        if (event.pointerType !== 'touch') return;
+        if (!event.isTrusted || event.pointerType !== 'touch') return;
         touchPointers.delete(event.pointerId);
     }
 
@@ -558,33 +600,128 @@
         longPressTimer = null;
     }
 
-    // Starts the long press timer when a single finger touches the YouTube fullscreen button. A long press toggles the fill zoom.
+    // Starts the long press timer when a single finger touches the YouTube fullscreen button. A long press toggles the letterbox removal.
     function onFullscreenButtonTouchStart(event) {
         if (event.touches.length !== 1 || !event.target.closest(YOUTUBE_FULLSCREEN_BUTTON_SELECTOR)) return;
+
         cancelLongPress();
         longPressTimer = setTimeout(() => {
             longPressTimer = null;
             if (navigator.vibrate) navigator.vibrate(LONG_PRESS_VIBRATION_MS);
-            setZoom(zoomMode === ZOOM_NONE ? ZOOM_FILL : ZOOM_NONE);
+            setZoom(zoomMode === ZOOM_NONE ? ZOOM_LETTERBOX : ZOOM_NONE);
         }, LONG_PRESS_MS);
     }
 
-    // Suppresses the context menu that a long press on the YouTube fullscreen button would otherwise open.
-    function onFullscreenButtonContextMenu(event) {
-        if (!event.target.closest(YOUTUBE_FULLSCREEN_BUTTON_SELECTOR)) return;
+    // Suppresses every context menu inside the fullscreen YouTube player.
+    function onPlayerContextMenu(event) {
         event.preventDefault();
         event.stopImmediatePropagation();
     }
 
-    // Runs every YouTube override. The overrides are the long press on the fullscreen button and the pause of the pinch gestures.
+    // Runs every YouTube override. The overrides are the long press on the fullscreen button and the suppression of the context menu.
     // The listeners sit on the fullscreen element, so they keep working when YouTube rebuilds its player controls.
     function startYouTubeOverrides(signal) {
         listenCapture(fullscreenEl, 'touchstart', onFullscreenButtonTouchStart, signal);
         listenCapture(fullscreenEl, 'touchend', cancelLongPress, signal);
         listenCapture(fullscreenEl, 'touchcancel', cancelLongPress, signal);
         listenCapture(fullscreenEl, 'touchmove', cancelLongPress, signal);
-        listenCapture(fullscreenEl, 'contextmenu', onFullscreenButtonContextMenu, signal, false);
+        listenCapture(fullscreenEl, 'contextmenu', onPlayerContextMenu, signal, false);
+
         onStop(signal, cancelLongPress);
+    }
+
+    // Tells YouTube that the first finger that it saw touch down was cancelled, once a second finger lands.
+    // YouTube never sees the rest of the gesture, so without this it would keep waiting for that finger, and a press and hold to play at 2X speed would never end.
+    function cancelYouTubeTouch() {
+        const pointer = youTubeFirstPointer;
+        const touch = youTubeFirstTouch;
+        youTubeFirstPointer = null;
+        youTubeFirstTouch = null;
+
+        if (pointer && pointer.target.isConnected) {
+            pointer.target.dispatchEvent(new PointerEvent('pointercancel', {
+                pointerId: pointer.pointerId,
+                pointerType: 'touch',
+                isPrimary: true,
+                bubbles: true,
+                composed: true,
+            }));
+        }
+
+        if (touch && touch.target.isConnected) {
+            try {
+                touch.target.dispatchEvent(new TouchEvent('touchcancel', {
+                    touches: [],
+                    targetTouches: [],
+                    changedTouches: [touch.touch],
+                    bubbles: true,
+                    composed: true,
+                }));
+            } catch (error) {
+                // Leaves YouTube alone on browsers that cannot construct touch events.
+            }
+        }
+    }
+
+    // Hides touch events from YouTube while two or more fingers are down, so that its own swipe and pinch gestures cannot fire.
+    // Once a second finger has landed, it keeps hiding until the last finger lifts, so that a finger left over after the pinch is not read as a swipe.
+    // It also remembers the first finger, which YouTube sees before the second one lands, so that cancelYouTubeTouch can cancel it.
+    function onYouTubeGestureTouch(event) {
+        if (!event.isTrusted) return;
+        const ending = event.type === 'touchend' || event.type === 'touchcancel';
+        // An ending event no longer lists the fingers that it lifted in touches, so those are added back.
+        const fingers = event.touches.length + (ending ? event.changedTouches.length : 0);
+
+        if (event.type === 'touchstart' && fingers === 1) {
+            hidingTouchesFromYouTube = false;
+            youTubeFirstTouch = { target: event.target, touch: event.changedTouches[0] };
+        }
+        if (fingers >= 2) hidingTouchesFromYouTube = true;
+
+        const hiding = hidingTouchesFromYouTube;
+        if (ending && event.touches.length === 0) {
+            hidingTouchesFromYouTube = false;
+            youTubeFirstTouch = null;
+        }
+        if (hiding) event.stopImmediatePropagation();
+    }
+
+    // Does the same for pointer events. The touch pointers are tracked by the pinch gestures, whose listeners run first on the same element.
+    function onYouTubeGesturePointer(event) {
+        if (!event.isTrusted || event.pointerType !== 'touch') return;
+
+        const ending = event.type === 'pointerup' || event.type === 'pointercancel';
+        const fingers = touchPointers.size + (ending ? 1 : 0);
+
+        if (event.type === 'pointerdown' && fingers === 1) {
+            hidingPointersFromYouTube = false;
+            youTubeFirstPointer = { target: event.target, pointerId: event.pointerId };
+        }
+        if (fingers >= 2) hidingPointersFromYouTube = true;
+
+        const hiding = hidingPointersFromYouTube;
+        if (ending && touchPointers.size === 0) {
+            hidingPointersFromYouTube = false;
+            youTubeFirstPointer = null;
+        }
+        if (hiding) event.stopImmediatePropagation();
+    }
+
+    // Disables YouTube's own swipe and pinch gestures while several fingers touch the screen. It runs after the pinch gestures, which it relies on.
+    function startYouTubeGestureBlock(signal) {
+        for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) {
+            listenCapture(fullscreenEl, type, onYouTubeGestureTouch, signal);
+        }
+        for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+            listenCapture(fullscreenEl, type, onYouTubeGesturePointer, signal);
+        }
+
+        onStop(signal, () => {
+            hidingTouchesFromYouTube = false;
+            hidingPointersFromYouTube = false;
+            youTubeFirstTouch = null;
+            youTubeFirstPointer = null;
+        });
     }
 
     // ---- Feature: on-screen buttons --------------------------------------
@@ -683,11 +820,12 @@
 
     // ---- Fullscreen lifecycle --------------------------------------------
 
-    // Starts working on a fullscreen element that contains a video. The automatic fill, if enabled, happens instantly as part of this initial zoom.
+    // Starts working on a fullscreen element that contains a video. The remembered zoom mode, if any, is applied instantly as part of this initial zoom when the video supports it.
+    // A video that was last left zoomed out, or that does not support the remembered mode, is simply left alone.
     function enterFullscreen(root) {
         fullscreenEl = root;
         zoomMode = ZOOM_NONE;
-        autoFillPending = settings.alwaysFillScreen;
+        pendingZoomMode = settings.rememberZoom ? lastZoomMode : ZOOM_NONE;
         syncFeatures();
         refreshZoom();
     }
@@ -697,7 +835,7 @@
         if (!fullscreenEl) return;
         fullscreenEl = null;
         zoomMode = ZOOM_NONE;
-        autoFillPending = false;
+        pendingZoomMode = ZOOM_NONE;
         syncFeatures();
     }
 
@@ -740,14 +878,20 @@
         toggleZoom(mode);
     });
 
-    // Reloads and reapplies every setting whenever any stored value changes.
+    // Follows the remembered zoom mode, and reloads and reapplies every setting whenever any other stored value changes.
+    // The zoom mode changes on every zoom, and reapplying the settings would refresh the zoom and cut its animation short, so a change to it alone never reloads the settings.
     chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'local') loadSettings(applySettings);
+        if (areaName !== 'local') return;
+        if (LAST_ZOOM_STORAGE_KEY in changes) lastZoomMode = toZoomMode(changes[LAST_ZOOM_STORAGE_KEY].newValue);
+        if (Object.keys(changes).some((key) => key !== LAST_ZOOM_STORAGE_KEY)) loadSettings(applySettings);
     });
 
     // Answers the page world when it asks for the state, which happens if it started after the settings had already loaded.
     window.addEventListener(BACKGROUND_PLAY_REQUEST_EVENT, sendBackgroundPlayState);
 
-    // Loads and applies the stored settings when the script starts.
-    loadSettings(applySettings);
+    // Loads the remembered zoom mode first, so that a video that is already fullscreen when the script starts can use it, and then loads and applies the stored settings.
+    chrome.storage.local.get(LAST_ZOOM_STORAGE_KEY, (result) => {
+        lastZoomMode = toZoomMode(result && result[LAST_ZOOM_STORAGE_KEY]);
+        loadSettings(applySettings);
+    });
 })();
