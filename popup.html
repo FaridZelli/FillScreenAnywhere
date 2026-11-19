@@ -37,11 +37,24 @@
     gap: 12px;
   }
 
+  .seg-label {
+    margin-bottom: 0.45em;
+  }
+
   .seg {
     display: flex;
     background: #2c2c2e;
     border-radius: 8px;
     margin-bottom: 1em;
+  }
+
+  .seg-compact {
+    margin-bottom: 0.4em;
+  }
+
+  .seg-compact + textarea {
+    margin-top: 0.8em;
+    margin-bottom: 0.6em;
   }
 
   .seg button {
@@ -85,6 +98,7 @@
     color: #8e8e93;
     font-size: 0.85em;
     margin: 0.25em 0 1em;
+    white-space: pre-line;
   }
 
   .hint-list {
@@ -273,17 +287,22 @@
 
     <hr>
 
-    <div class="row">
-      <label for="rememberZoom">Remember zoom</label>
-      <div class="switch"><input type="checkbox" id="rememberZoom"><span class="slider"></span></div>
+    <div class="seg-label">Mode</div>
+    <div class="seg seg-compact">
+      <button id="fillModeManual" class="active">Manual</button>
+      <button id="fillModeAuto">Auto fill</button>
+      <button id="fillModeRemember">Remember</button>
     </div>
-    <div class="hint">Save and restore the last used zoom state.</div>
+    <div class="hint" id="fillModeHint"></div>
 
-    <div class="row">
-      <label for="backgroundPlay">Enable background play</label>
-      <div class="switch"><input type="checkbox" id="backgroundPlay"><span class="slider"></span></div>
+    <div class="seg-label">Background play</div>
+    <div class="seg seg-compact">
+      <button id="bgPlayOff" class="active">Off</button>
+      <button id="bgPlayEverywhere">Everywhere</button>
+      <button id="bgPlayCustom">Custom</button>
     </div>
-    <div class="hint">Keep playing videos while using other apps.</div>
+    <textarea id="backgroundPlayList" placeholder="example.com" style="display:none"></textarea>
+    <div class="hint" id="backgroundPlayHint"></div>
 
     <hr>
 
@@ -311,6 +330,18 @@
       <div class="hint">Smoothly transition in and out of zoom states.</div>
 
       <div class="row">
+        <label for="limitCropAll">Limit crop for all videos</label>
+        <div class="switch"><input type="checkbox" id="limitCropAll" checked><span class="slider"></span></div>
+      </div>
+      <div class="hint">Prevent excessive horizontal/vertical cropping.</div>
+
+      <div class="row">
+        <label for="limitCrop16By9">Limit crop for 16:9 videos</label>
+        <div class="switch"><input type="checkbox" id="limitCrop16By9"><span class="slider"></span></div>
+      </div>
+      <div class="hint">Hide camera cutouts and allow vertical crop.</div>
+
+      <div class="row">
         <label for="hideButtons">Hide on-screen buttons</label>
         <div class="switch"><input type="checkbox" id="hideButtons"><span class="slider"></span></div>
       </div>
@@ -320,19 +351,7 @@
         <label for="overrideYouTube">Enable YouTube overrides</label>
         <div class="switch"><input type="checkbox" id="overrideYouTube"><span class="slider"></span></div>
       </div>
-      <div class="hint">Fix numerous issues on YouTube's mobile site.</div>
-
-      <div class="row">
-        <label for="capTaller">Limit crop on 3:2 or taller videos</label>
-        <div class="switch"><input type="checkbox" id="capTaller" checked><span class="slider"></span></div>
-      </div>
-      <div class="hint">Prevent excessive horizontal cropping.</div>
-
-      <div class="row">
-        <label for="capWider">Limit crop on 2:1 or wider videos</label>
-        <div class="switch"><input type="checkbox" id="capWider" checked><span class="slider"></span></div>
-      </div>
-      <div class="hint">Prevent excessive vertical cropping.</div>
+      <div class="hint">Fix numerous issues on YouTube's mobile site.<br>Hold the full screen button to remove letterboxing.</div>
     </details>
 
     <hr>

@@ -102,7 +102,7 @@
     // Holds the current zoom mode.
     let zoomMode = ZOOM_NONE;
 
-    // Holds the remembered zoom mode that should still be applied automatically as soon as it becomes available, or ZOOM_NONE when nothing is pending.
+    // Holds the automatic zoom mode that should still be applied as soon as it becomes available, or ZOOM_NONE when nothing is pending.
     let pendingZoomMode = ZOOM_NONE;
 
     // Holds the remembered zoom mode, which is the last zoom mode that the user chose.
@@ -207,6 +207,14 @@
         return isAllowMode ? matched : !matched;
     }
 
+    // Tells whether background play is enabled on the current site.
+    // In everywhere mode it follows the site allow/deny list, while in custom mode it uses its own domain list.
+    function isBackgroundPlayEnabled(siteEnabled) {
+        if (settings.backgroundPlay === 'everywhere') return siteEnabled;
+        if (settings.backgroundPlay === 'custom') return settings.backgroundPlayList.some(hostMatches);
+        return false;
+    }
+
     // ---- Page helpers ----------------------------------------------------
 
     // Finds the video inside a root element. When several videos exist, it returns the one with the largest area.
@@ -290,39 +298,55 @@
         return { videoRatio: videoWidth / videoHeight, screenRatio: innerWidth / innerHeight };
     }
 
-    // Limits a scale so that tall and wide videos are never cropped excessively on a horizontal display.
+    // Tells whether a video aspect ratio counts as 16:9.
+    function is16By9(videoRatio) {
+        return Math.abs(videoRatio - RATIO_16_9) < ASPECT_TOLERANCE;
+    }
+
+    // Returns the horizontal (wider) and vertical (taller) aspect ratio crop bounds for a video, or null when no crop limit applies.
+    // The 16:9 limit overrides the general limit for 16:9 videos so it can tighten horizontal cropping while allowing vertical cropping.
+    function getCropLimits(videoRatio) {
+        if (settings.limitCrop16By9 && is16By9(videoRatio)) {
+            return { maxHorizontal: RATIO_2_1, minVertical: RATIO_9_16 };
+        }
+        if (!settings.limitCropAll) return null;
+        if (videoRatio <= RATIO_3_2) {
+            return { maxHorizontal: RATIO_16_9, minVertical: Infinity };
+        }
+        if (videoRatio >= RATIO_2_1) {
+            return { maxHorizontal: RATIO_12_5, minVertical: RATIO_16_9 };
+        }
+        return { maxHorizontal: RATIO_12_5, minVertical: RATIO_3_2 };
+    }
+
+    // Limits a fill-screen scale so that videos are not cropped beyond their configured aspect ratio bounds.
     function capScale(scale, videoRatio, screenRatio) {
-        // Applies the limits only when the display is horizontal.
-        if (screenRatio <= 1) return scale;
-        let capped = scale;
-
-        // Never crops a 3:2 or taller video wider than 16:9 on a display that is wider than the video.
-        if (settings.capTaller && videoRatio <= RATIO_3_2 && screenRatio > videoRatio) {
-            capped = Math.min(capped, RATIO_16_9 / videoRatio);
+        const limits = getCropLimits(videoRatio);
+        if (!limits) return scale;
+        if (screenRatio > videoRatio) {
+            return Math.min(scale, Math.max(1, limits.maxHorizontal / videoRatio));
         }
-
-        // Never crops a 2:1 or wider video taller than 16:9 on a display that is taller than the video.
-        if (settings.capWider && videoRatio >= RATIO_2_1 && screenRatio < videoRatio) {
-            capped = Math.min(capped, videoRatio / RATIO_16_9);
+        if (screenRatio < videoRatio) {
+            if (!Number.isFinite(limits.minVertical)) return 1;
+            return Math.min(scale, Math.max(1, videoRatio / limits.minVertical));
         }
-        return capped;
+        return scale;
     }
 
     // Returns the scale that a zoom mode would apply to the video, or one when the mode does not apply to this video.
-    // Removing the letterbox applies only to 16:9 videos.
+    // Removing the letterbox applies only to 16:9 videos and is not subject to the fill-screen crop limits.
     function getZoomScale(mode, video) {
         const ratios = getRatios(video);
         if (!ratios) return 1;
         const { videoRatio, screenRatio } = ratios;
-        let scale = 1;
         if (mode === ZOOM_FILL) {
-            scale = Math.max(videoRatio / screenRatio, screenRatio / videoRatio);
-        } else if (mode === ZOOM_LETTERBOX && Math.abs(videoRatio - RATIO_16_9) < ASPECT_TOLERANCE) {
-            scale = LETTERBOX_SCALE;
-        } else {
-            return 1;
+            const scale = Math.max(videoRatio / screenRatio, screenRatio / videoRatio);
+            return capScale(scale, videoRatio, screenRatio);
         }
-        return capScale(scale, videoRatio, screenRatio);
+        if (mode === ZOOM_LETTERBOX && is16By9(videoRatio)) {
+            return LETTERBOX_SCALE;
+        }
+        return 1;
     }
 
     // Returns the transform origin that keeps the center of the video fixed while the target scales, or null when the video has no size.
@@ -396,9 +420,9 @@
     }
 
     // Stores the zoom mode that the user chose, so that the next fullscreen session can pick up where this one left off.
-    // Nothing is stored while the remember zoom state setting is off.
+    // Nothing is stored outside Remember mode.
     function saveZoomMode(mode) {
-        if (!settings.rememberZoom) return;
+        if (settings.fillMode !== 'remember') return;
         lastZoomMode = mode;
         chrome.storage.local.set({ [LAST_ZOOM_STORAGE_KEY]: mode });
     }
@@ -422,13 +446,29 @@
         }
     }
 
-    // Brings the zoom in line with the current layout without animation. It also applies the remembered zoom mode as soon as that mode becomes available for the video.
+    // Returns the zoom mode that should be applied automatically upon entering fullscreen, or ZOOM_NONE in manual mode.
+    function getInitialPendingZoom() {
+        if (settings.fillMode === 'remember') return lastZoomMode;
+        if (settings.fillMode === 'auto') return ZOOM_FILL;
+        return ZOOM_NONE;
+    }
+
+    // Tells whether a pending automatic zoom mode can be applied to the video right now.
+    // Auto fill only triggers when the available fill-screen scale is at or below AUTO_FILL_MAX_SCALE.
+    function canApplyPendingZoom(mode, video) {
+        const scale = getZoomScale(mode, video);
+        if (scale <= ZOOM_THRESHOLD) return false;
+        if (settings.fillMode === 'auto') return scale <= AUTO_FILL_MAX_SCALE + AUTO_FILL_EPSILON;
+        return true;
+    }
+
+    // Brings the zoom in line with the current layout without animation. It also applies any pending automatic zoom as soon as it becomes available for the video.
     // Until then the video simply stays zoomed out, and the stored mode is left untouched.
     function refreshZoom() {
         if (!fullscreenEl) return;
         if (pendingZoomMode !== ZOOM_NONE && zoomMode === ZOOM_NONE) {
             const video = findVideo(fullscreenEl);
-            if (video && getZoomScale(pendingZoomMode, video) > ZOOM_THRESHOLD) {
+            if (video && canApplyPendingZoom(pendingZoomMode, video)) {
                 const mode = pendingZoomMode;
                 pendingZoomMode = ZOOM_NONE;
                 applyZoom(mode, false);
@@ -820,12 +860,12 @@
 
     // ---- Fullscreen lifecycle --------------------------------------------
 
-    // Starts working on a fullscreen element that contains a video. The remembered zoom mode, if any, is applied instantly as part of this initial zoom when the video supports it.
-    // A video that was last left zoomed out, or that does not support the remembered mode, is simply left alone.
+    // Starts working on a fullscreen element that contains a video. Any automatic zoom (Auto fill or Remember) is applied instantly when supported.
+    // A video that does not qualify for automatic zoom is simply left alone.
     function enterFullscreen(root) {
         fullscreenEl = root;
         zoomMode = ZOOM_NONE;
-        pendingZoomMode = settings.rememberZoom ? lastZoomMode : ZOOM_NONE;
+        pendingZoomMode = getInitialPendingZoom();
         syncFeatures();
         refreshZoom();
     }
@@ -857,15 +897,19 @@
 
     // Applies a freshly loaded settings object to every part of the content script.
     function applySettings(loadedSettings) {
+        const previousFillMode = settings ? settings.fillMode : null;
         settings = loadedSettings;
         const siteEnabled = isSiteEnabled();
+        if (fullscreenEl && previousFillMode !== null && previousFillMode !== settings.fillMode && zoomMode === ZOOM_NONE) {
+            pendingZoomMode = getInitialPendingZoom();
+        }
         syncFeature(startViewport, siteEnabled && settings.centerVideos);
         syncFeature(startFullscreenListener, siteEnabled);
         syncFeatures();
         refreshZoom();
 
         // Tells the page world whether background play is enabled for this site.
-        backgroundPlayEnabled = siteEnabled && settings.backgroundPlay;
+        backgroundPlayEnabled = isBackgroundPlayEnabled(siteEnabled);
         sendBackgroundPlayState();
     }
 
