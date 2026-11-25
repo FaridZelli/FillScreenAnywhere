@@ -1,8 +1,14 @@
-# Fill Screen Anywhere 
+# Fill Screen Anywhere
+Get it on [AMO (addons.mozilla.org)](https://addons.mozilla.org/en-US/firefox/addon/fillscreen/)
+
+
 [![Firefox Add-ons Users](https://img.shields.io/amo/users/FillScreenAnywhere%40FaridZelli?style=for-the-badge&logo=firefoxbrowser&label=firefox%20users&logoColor=white&labelColor=orange&color=gold&cacheSeconds=86400)](https://addons.mozilla.org/en-US/firefox/addon/fillscreen/)
-  
-  
-[![Firefox Add-ons Stars](https://img.shields.io/amo/stars/FillScreenAnywhere%40FaridZelli?style=for-the-badge&logo=mozilla&label=amo%20stars&labelColor=black&color=gold&cacheSeconds=86400)](https://addons.mozilla.org/en-US/firefox/addon/fillscreen/)
+
+
+Get it on [Chrome Web Store](https://chromewebstore.google.com/detail/fill-screen-anywhere/kbfolmjecomellaiahheicnecheglbid)
+
+
+[![Chrome Web Store Users](https://img.shields.io/chrome-web-store/users/kbfolmjecomellaiahheicnecheglbid?style=for-the-badge&logo=chromewebstore&label=chromium%20users&logoColor=white&labelColor=blue&color=green&cacheSeconds=86400)](https://chromewebstore.google.com/detail/fill-screen-anywhere/kbfolmjecomellaiahheicnecheglbid)
 
 ---
 
@@ -19,8 +25,10 @@ Works on Firefox and Chromium (see [releases](https://github.com/FaridZelli/Fill
 - Long press the full screen button to remove letterboxing (YouTube only)
 
 ## Desktop usage
-- Fill Screen: `Ctrl+Alt+F`
-- Remove Letterboxing: `Ctrl+Alt+L`
+- Look for the "Fill Screen" button on the right side.
+### Firefox only
+- Fill Screen shortcut: `Ctrl+Alt+F`
+- Remove Letterboxing shortcut: `Ctrl+Alt+L`
 > See [Manage extension shortcuts in Firefox](https://support.mozilla.org/en-US/kb/manage-extension-shortcuts-firefox) for more info.
 
 ## Features
